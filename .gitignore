@@ -9,10 +9,10 @@ node_modules/
 .env.*
 !.env.example
 .removebg-key
-data/*
+# data/*
 !data/.gitkeep
 backups/
-*.sqlite
+# *.sqlite
 *.sqlite-*
 *.db
 *.zip
@@ -31,7 +31,7 @@ __pycache__/
 loja-online-v5-legibilidade-carrinho/
 
 # Imagens criadas ou enviadas durante o uso
-/public/uploads/*
+# /public/uploads/*
 /public/posts/*
 /public/fone-test.png
 /public/fone-test.png

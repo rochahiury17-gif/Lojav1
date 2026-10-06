@@ -190,10 +190,7 @@ if (!db.prepare("SELECT id FROM categories LIMIT 1").get()) {
   db.prepare("INSERT INTO categories(name,slug) VALUES(?,?)").run("Destaques","destaques");
   db.prepare("INSERT INTO categories(name,slug) VALUES(?,?)").run("Eletrônicos","eletronicos");
   db.prepare("INSERT INTO categories(name,slug) VALUES(?,?)").run("Casa","casa");
-  const cat = db.prepare("SELECT id FROM categories WHERE slug='eletronicos'").get();
-  db.prepare(`INSERT INTO products(category_id,name,slug,description,price,cost,stock,featured,sku)
-              VALUES(?,?,?,?,?,?,?,?,?)`).run(cat.id,"Produto de exemplo","produto-de-exemplo",
-              "Edite ou remova este produto pelo painel administrativo.",99.90,50,20,1,"SKU-001");
+  // Produtos de exemplo desativados
 }
 
 
@@ -210,12 +207,7 @@ const v8Demo=[
   ["Eletrônicos","SSD Ultra 1TB","ssd-ultra-1tb","Armazenamento rápido de 1TB para acelerar seu computador.",329.90,1,"/demo/ssd.svg",1,"V8-SSD-09"],
   ["Eletrônicos","Carregador GaN 65W","carregador-gan-65w","Carregador compacto de alta potência para celular, tablet e notebook.",129.90,0,"/demo/carregador.svg",1,"V8-GAN-10"]
 ];
-const demoExists=db.prepare("SELECT id FROM products WHERE slug='fone-pulse-x'").get();
-if(!demoExists){
-  const cat=db.prepare("SELECT id FROM categories WHERE slug='eletronicos'").get();
-  const ins=db.prepare(`INSERT INTO products(category_id,name,slug,description,price,cost,stock,featured,image,sku) VALUES(?,?,?,?,?,?,?,?,?,?)`);
-  for(const [category,name,slug,description,price,featured,image,stock,sku] of v8Demo){ins.run(cat?.id||null,name,slug,description,price,Math.round(price*.62),stock,featured,image,sku)}
-}
+// v8Demo desativado
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
