@@ -373,7 +373,20 @@ app.post("/api/orders",auth,(req,res)=>{
     if(required.some(k=>!String(a[k]||"").trim()))return res.status(400).json({error:"Preencha CEP, rua, número, bairro, cidade e UF para a entrega."});
     address={label:"Endereço de entrega",cep:String(a.cep).trim(),street:String(a.street).trim(),number:String(a.number).trim(),complement:String(a.complement||"").trim(),neighborhood:String(a.neighborhood).trim(),city:String(a.city).trim(),state:String(a.state).trim().toUpperCase()};
   }
-  let transactionOpen=false;
+  // Atualizar CPF e telefone do usuario se informados no pedido
+    try {
+      const uPhone = req.body.phone ? normalizeWhatsApp(req.body.phone) : null;
+      const uCpf = req.body.cpf ? String(req.body.cpf).trim() : null;
+      if (uPhone || uCpf) {
+        const cur = db.prepare("SELECT phone, cpf FROM users WHERE id=?").get(req.session.userId);
+        if (cur) {
+          const finalPhone = uPhone || cur.phone;
+          const finalCpf = uCpf || cur.cpf;
+          db.prepare("UPDATE users SET phone=?, cpf=? WHERE id=?").run(finalPhone, finalCpf, req.session.userId);
+        }
+      }
+    } catch(e) {}
+    let transactionOpen=false;
   try{
     db.exec("BEGIN IMMEDIATE");transactionOpen=true;
     if(!req.body.address_id){
