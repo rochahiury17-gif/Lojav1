@@ -1,3 +1,52 @@
+
+window.exportProductsBackup = async function() {
+  try {
+    const token = (typeof store !== "undefined" && store.token) ? store.token : localStorage.getItem("token");
+    const headers = token ? { "Authorization": "Bearer " + token } : {};
+    const res = await fetch("/api/admin/products/export", { headers });
+    if (!res.ok) throw new Error("Erro ao baixar backup");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "produtos-backup.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast("✓ Backup baixado com sucesso!");
+  } catch(err) {
+    toast("Erro ao exportar: " + err.message, "warn");
+  }
+};
+
+window.importProductsBackup = async function(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  if (!confirm("Deseja restaurar os produtos deste arquivo de backup?")) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const token = (typeof store !== "undefined" && store.token) ? store.token : localStorage.getItem("token");
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = "Bearer " + token;
+    toast("Restaurando produtos...");
+    const res = await fetch("/api/admin/products/import", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(data)
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || "Falha na importacao");
+    alert("✓ " + (result.imported || 0) + " produtos restaurados com sucesso!");
+    adminProducts();
+  } catch(err) {
+    alert("Erro ao importar: " + (err.message || "Arquivo invalido"));
+  } finally {
+    e.target.value = "";
+  }
+};
+
 window.closeModal = window.closeModal || function(){var m=document.getElementById('modal');if(m){m.classList.add('hidden');m.innerHTML=''}};
 window.onerror = function(msg, url, line, col, err) {
   var b = document.createElement('div');
@@ -731,6 +780,21 @@ async function adminProducts(){
       <button id="btnBulkDelete" onclick="deleteSelectedProds()" style="display:none;background:#ef4444;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:bold;cursor:pointer;">
         🗑️ Excluir (<span id="bulkCount">0</span>)
       </button>
+    </div>
+
+    
+    <div style="background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.25);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div>
+        <b style="color:#22d3ee;font-size:12px;display:block;">💾 Cópia de Segurança do Catálogo</b>
+        <small style="color:#94a3b8;font-size:11px;">Baixe o backup antes de atualizar ou restaure se reiniciar.</small>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button type="button" onclick="exportProductsBackup()" style="background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:bold;cursor:pointer;">📥 Baixar Backup</button>
+        <label style="background:#22d3ee;color:#061116;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;margin:0;">
+          📤 Restaurar Catálogo
+          <input type="file" accept=".json" onchange="importProductsBackup(event)" style="display:none;">
+        </label>
+      </div>
     </div>
 
     <div id="adminProductList">

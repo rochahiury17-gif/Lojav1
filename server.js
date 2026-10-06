@@ -463,6 +463,58 @@ app.post("/api/admin/upload-image", manager, (req,res)=>{
   } catch(e) { res.status(400).json({error:"Não foi possível salvar a imagem."}); }
 });
 
+
+// EXPORTAR E IMPORTAR PRODUTOS (BACKUP E RESTAURACAO)
+app.get("/api/admin/products/export", admin, (req, res) => {
+  try {
+    const prods = db.prepare("SELECT * FROM products ORDER BY id ASC").all();
+    res.setHeader("Content-Disposition", "attachment; filename=produtos-backup.json");
+    res.setHeader("Content-Type", "application/json");
+    res.send(JSON.stringify(prods, null, 2));
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post("/api/admin/products/import", admin, (req, res) => {
+  try {
+    const list = Array.isArray(req.body) ? req.body : (req.body && req.body.products ? req.body.products : []);
+    if (!list.length) return res.status(400).json({ error: "Nenhum produto encontrado no arquivo." });
+    let count = 0;
+    const insertStmt = db.prepare(`
+      INSERT INTO products (category_id, supplier_id, name, slug, description, image, images, sku, price, cost, stock, active, featured, sort_order)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `);
+    for (const p of list) {
+      if (!p.name) continue;
+      let baseSlug = String(p.name).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "produto";
+      let slug = baseSlug;
+      let suffix = 2;
+      while (db.prepare("SELECT id FROM products WHERE slug = ?").get(slug)) {
+        slug = baseSlug + "-" + (suffix++);
+      }
+      const imgs = typeof p.images === "string" ? p.images : JSON.stringify(p.images || (p.image ? [p.image] : []));
+      const mainImg = p.image || (Array.isArray(p.images) && p.images[0]) || "";
+      insertStmt.run(
+        p.category_id || null,
+        p.supplier_id || null,
+        p.name,
+        slug,
+        p.description || "",
+        mainImg,
+        imgs,
+        p.sku || "",
+        Number(p.price) || 0,
+        Number(p.cost) || 0,
+        Number(p.stock) || 0,
+        p.active === 0 ? 0 : 1,
+        p.featured ? 1 : 0,
+        Number(p.sort_order) || 0
+      );
+      count++;
+    }
+    res.json({ ok: true, imported: count });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get("/api/admin/products",admin,(req,res)=>res.json(db.prepare("SELECT * FROM products ORDER BY sort_order ASC, id DESC").all()));
 app.post("/api/admin/products",manager,(req,res)=>{
   const p=req.body;
