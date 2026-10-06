@@ -1,0 +1,1 @@
+Copie lban.png para esta pasta no Termux.

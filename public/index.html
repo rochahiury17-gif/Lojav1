@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#070a0f">
+<title>MachadoExpress — Tecnologia, praticidade e estilo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css?v=20261006-065839">
+</head>
+<body>
+<div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+<div class="topline"><div class="container top-inner"><span><i></i> MACHADOEXPRESS • NOVAS OFERTAS</span><span>Compra segura · Suporte · Pagamento protegido</span></div></div>
+<header class="site-header">
+  <div class="container nav">
+    <a class="brand" href="#/">
+      <span class="brand-symbol"><b></b></span>
+      <span class="brand-text">MACHADO<span>EXPRESS</span><small>TECH STORE</small></span>
+    </a>
+    <nav><a href="#/">Início</a><a href="#/produtos">Produtos</a><a href="#/conta">Minha conta</a><a id="adminNav" class="admin-link" href="#/admin">Admin</a></nav>
+    <div class="nav-tools">
+      <button class="icon-btn" onclick="openSearch()" title="Buscar">⌕</button>
+      <a class="account-btn" href="#/conta" aria-label="Abrir minha conta" title="Minha conta"><span aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M5 21a7 7 0 0 1 14 0"></path></svg></span><em id="accountLabel">Minha conta</em><b aria-hidden="true" style="font-size:12px;margin-left:3px">›</b></a>
+      <button class="cart-btn" onclick="openCart()"><span>🛒</span><em>Carrinho</em><b id="cartCount">0</b></button>
+      <button class="menu-btn" onclick="document.body.classList.toggle('menu-open')">☰</button>
+    </div>
+  </div>
+</header>
+<div class="mobile-nav">
+  <a href="#/" onclick="closeMenu()">Início</a><a href="#/produtos" onclick="closeMenu()">Produtos</a><a href="#/conta" onclick="closeMenu()">Minha conta</a><a id="mobileAdminNav" href="#/admin" onclick="closeMenu()">Admin</a>
+</div>
+<main id="app"></main>
+<div id="toast"></div>
+<div id="modal" class="modal hidden"></div>
+<div id="cartDrawer" class="cart-drawer"></div>
+<div id="cartBackdrop" class="drawer-backdrop" onclick="closeCart()"></div>
+<footer id="footer"></footer>
+<script src="/app.js?v=1791251945"></script>
+<div style="text-align: center; margin: 20px 0; padding: 10px;">
+    <a href="politicas.html" style="color: #f39c12; text-decoration: none;">Políticas e Prazos</a>
+</div>
+
+</body>
+</html>

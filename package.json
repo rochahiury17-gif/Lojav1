@@ -1,0 +1,16 @@
+{
+  "name": "loja-online-v1",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Loja online tech premium para Termux",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1"
+  }
+}

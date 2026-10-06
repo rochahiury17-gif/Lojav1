@@ -1,0 +1,36 @@
+node_modules/
+data/
+.env
+*.log
+
+# Dependências, segredos e dados locais
+node_modules/
+.env
+.env.*
+!.env.example
+.removebg-key
+data/*
+!data/.gitkeep
+backups/
+*.sqlite
+*.sqlite-*
+*.db
+*.zip
+*.log
+*.backup*
+
+# Backups e arquivos temporários
+*.bak
+*.bak-*
+*.bak.*
+*.pyc
+__pycache__/
+
+# Backups e cópia antiga da loja
+*.bak*
+loja-online-v5-legibilidade-carrinho/
+
+# Imagens criadas ou enviadas durante o uso
+/public/uploads/*
+/public/posts/*
+/public/fone-test.png
