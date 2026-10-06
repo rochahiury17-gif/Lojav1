@@ -238,6 +238,17 @@ app.use(session({
 app.use(express.static(path.join(__dirname,"public")));
 
 function setting(key){ return db.prepare("SELECT value FROM settings WHERE key=?").get(key)?.value ?? ""; }
+
+function normalizeWhatsApp(num) {
+  if (!num) return "";
+  let digits = String(num).replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length === 10 || digits.length === 11) {
+    digits = "55" + digits;
+  }
+  return digits;
+}
+
 function settings(){ return Object.fromEntries(db.prepare("SELECT key,value FROM settings").all().map(x=>[x.key,x.value])); }
 function userSafe(u){ if(!u) return null; const {password,...safe}=u; return safe; }
 function auth(req,res,next){ if(!req.session.userId) return res.status(401).json({error:"Faça login."}); next(); }
@@ -290,7 +301,7 @@ app.post("/api/auth/register",(req,res)=>{
   if(!name || !email || !password || password.length<6) return res.status(400).json({error:"Nome, e-mail e senha (mínimo 6 caracteres) são obrigatórios."});
   try{
     const hash=bcrypt.hashSync(password,10);
-    const r=db.prepare("INSERT INTO users(name,email,password,phone,cpf,role) VALUES(?,?,?,?,?,?)").run(name,email.toLowerCase(),hash,phone||"",cpf||"","customer");
+    const normPhone = normalizeWhatsApp(phone); const r=db.prepare("INSERT INTO users(name,email,password,phone,cpf,role) VALUES(?,?,?,?,?,?)").run(name,email.toLowerCase(),hash,normPhone,cpf||"","customer");
     req.session.userId=r.lastInsertRowid;
     res.json({user:userSafe(db.prepare("SELECT * FROM users WHERE id=?").get(r.lastInsertRowid))});
   }catch(e){res.status(400).json({error:"E-mail já cadastrado."});}
@@ -582,7 +593,25 @@ app.patch("/api/admin/products/:id",manager,(req,res)=>{
 });
 app.delete("/api/admin/products/:id",manager,(req,res)=>{db.prepare("DELETE FROM products WHERE id=?").run(req.params.id);res.json({ok:true});});
 
-app.get("/api/admin/customers",admin,(req,res)=>res.json(db.prepare(`SELECT id,name,email,phone,cpf,active,created_at FROM users WHERE role='customer' ORDER BY id DESC`).all()));
+app.get("/api/admin/customers", admin, (req, res) => {
+  try {
+    const sql = `
+      SELECT 
+        u.id, u.name, u.email, u.phone, u.cpf, u.active, u.created_at,
+        (SELECT COUNT(*) FROM orders WHERE user_id = u.id) as orders_count,
+        (SELECT COALESCE(SUM(total), 0) FROM orders WHERE user_id = u.id) as total_spent,
+        (SELECT street || ', nº ' || number || (CASE WHEN complement IS NOT NULL AND complement != '' THEN ' (' || complement || ')' ELSE '' END) || ' - ' || neighborhood || ', ' || city || '/' || state || ' - CEP: ' || cep 
+         FROM addresses WHERE user_id = u.id ORDER BY id DESC LIMIT 1) as full_address
+      FROM users u
+      WHERE u.role = 'customer'
+      ORDER BY u.id DESC
+    `;
+    const rows = db.prepare(sql).all();
+    res.json(rows);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 app.get("/api/admin/users",admin,(req,res)=>res.json(db.prepare(`SELECT id,name,email,phone,role,active,created_at FROM users WHERE role!='customer' ORDER BY id DESC`).all()));
 app.post("/api/admin/users",fullAdmin,(req,res)=>{
   const {name,email,password,phone,role}=req.body;
