@@ -492,24 +492,36 @@ app.post("/api/admin/products/import", admin, (req, res) => {
   try {
     const list = Array.isArray(req.body) ? req.body : (req.body && req.body.products ? req.body.products : []);
     if (!list.length) return res.status(400).json({ error: "Nenhum produto encontrado no arquivo." });
+    
     let count = 0;
+    const catCheck = db.prepare("SELECT id FROM categories WHERE id = ?");
+    const supCheck = db.prepare("SELECT id FROM suppliers WHERE id = ?");
     const insertStmt = db.prepare(`
       INSERT INTO products (category_id, supplier_id, name, slug, description, image, images, sku, price, cost, stock, active, featured, sort_order)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `);
+    
     for (const p of list) {
       if (!p.name) continue;
+      
+      let catId = p.category_id ? Number(p.category_id) : null;
+      if (catId && !catCheck.get(catId)) catId = null;
+      
+      let supId = p.supplier_id ? Number(p.supplier_id) : null;
+      if (supId && !supCheck.get(supId)) supId = null;
+
       let baseSlug = String(p.name).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "produto";
       let slug = baseSlug;
       let suffix = 2;
       while (db.prepare("SELECT id FROM products WHERE slug = ?").get(slug)) {
-        slug = baseSlug + "-" + (suffix++);
+        slug = `${baseSlug}-${suffix++}`;
       }
       const imgs = typeof p.images === "string" ? p.images : JSON.stringify(p.images || (p.image ? [p.image] : []));
       const mainImg = p.image || (Array.isArray(p.images) && p.images[0]) || "";
+      
       insertStmt.run(
-        p.category_id || null,
-        p.supplier_id || null,
+        catId,
+        supId,
         p.name,
         slug,
         p.description || "",
