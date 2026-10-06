@@ -664,3 +664,56 @@ select:-webkit-autofill {
   object-fit: contain !important;
   padding: 0 !important;
 }
+
+
+/* Custom fixes */
+.auth-fields input {
+  background: #0f172a !important;
+  color: #ffffff !important;
+  border: 1.5px solid #38bdf8 !important;
+  font-size: 16px !important;
+  padding: 12px 14px !important;
+  border-radius: 8px !important;
+}
+.auth-fields input::placeholder {
+  color: #94a3b8 !important;
+}
+.product-modal-compact {
+  max-width: 580px !important;
+  padding: 16px 18px !important;
+}
+.product-modal-compact .two-fields,
+.product-modal-compact .product-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.product-modal-compact label {
+  font-size: 11px !important;
+  margin-bottom: 2px !important;
+}
+.product-modal-compact input,
+.product-modal-compact select,
+.product-modal-compact textarea {
+  padding: 8px 10px !important;
+  font-size: 13px !important;
+}
+.admin-order-alert {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 99999;
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: #ffffff;
+  padding: 14px 18px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5), 0 0 0 2px rgba(52, 211, 153, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: slideInNotification 0.35s ease-out;
+}
+@keyframes slideInNotification {
+  from { transform: translateY(-30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
