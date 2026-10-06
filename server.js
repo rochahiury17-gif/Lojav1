@@ -260,6 +260,19 @@ function manager(req,res,next){
   });
 }
 function audit(userId, action, details=""){ db.prepare("INSERT INTO audit_logs(user_id,action,details) VALUES(?,?,?)").run(userId,action,details); }
+function makeProductSlug(name, excludeId = null) {
+  let base = slugify(name) || "produto";
+  let slug = base;
+  let counter = 1;
+  while (true) {
+    const row = excludeId
+      ? db.prepare("SELECT id FROM products WHERE slug = ? AND id != ?").get(slug, excludeId)
+      : db.prepare("SELECT id FROM products WHERE slug = ?").get(slug);
+    if (!row) return slug;
+    counter++;
+    slug = base + "-" + counter;
+  }
+}
 function slugify(s){ return String(s).toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,""); }
 
 app.get("/api/auth/session",(req,res)=>res.json({authenticated:!!req.session.userId,user:userSafe(currentUser(req))}));
@@ -462,7 +475,7 @@ app.get("/api/admin/products",admin,(req,res)=>res.json(db.prepare("SELECT * FRO
 app.post("/api/admin/products",manager,(req,res)=>{
   const p=req.body;
   try{
-    const slug=slugify(p.name);
+    const slug=makeProductSlug(p.name);
     let imagesArr = Array.isArray(p.images) ? p.images : (p.images ? [p.images] : []);
     if(p.image && !imagesArr.includes(p.image)) imagesArr.unshift(p.image);
     const mainImage = imagesArr.length > 0 ? imagesArr[0] : (p.image || "");
@@ -479,7 +492,7 @@ app.post("/api/admin/products",manager,(req,res)=>{
 app.patch("/api/admin/products/:id",manager,(req,res)=>{
   const p=req.body;
   try{
-    const slug = slugify(p.name || `produto-${req.params.id}`);
+    const slug = makeProductSlug(p.name || (`produto-${req.params.id}`), req.params.id);
     let imagesArr = Array.isArray(p.images) ? p.images : [];
     if(p.image && !imagesArr.includes(p.image)) imagesArr.unshift(p.image);
     const mainImage = imagesArr.length > 0 ? imagesArr[0] : (p.image || "");
