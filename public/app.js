@@ -1292,7 +1292,7 @@ async function updateProduct(e, id){
     body.featured = body.featured === "1";
     body.active = body.active === "1" ? 1 : 0;
     
-    await api("/api/admin/products/" + id, {method:"PUT", body:JSON.stringify(body)});
+    await api("/api/admin/products/" + id, {method:"PATCH", body:JSON.stringify(body)});
     closeModal();
     toast("✓ Produto atualizado com sucesso!");
     adminProducts();

@@ -489,6 +489,10 @@ app.post("/api/admin/products",manager,(req,res)=>{
     res.status(400).json({error:e.message});
   }
 });
+app.put("/api/admin/products/:id",manager,(req,res)=>{
+  req.method="PATCH";
+  app._router.handle(req,res);
+});
 app.patch("/api/admin/products/:id",manager,(req,res)=>{
   const p=req.body;
   try{
