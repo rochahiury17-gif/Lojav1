@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS products (
  active INTEGER NOT NULL DEFAULT 1,
  featured INTEGER NOT NULL DEFAULT 0,
  sort_order INTEGER DEFAULT 0,
- images TEXT DEFAULT "[]",
+ images TEXT DEFAULT '[]',
  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
  FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,
  FOREIGN KEY(supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL
@@ -136,7 +136,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 // Migracoes de seguranca para bancos existentes
 try { db.exec("ALTER TABLE products ADD COLUMN sort_order INTEGER DEFAULT 0;"); } catch(e) {}
-try { db.exec("ALTER TABLE products ADD COLUMN images TEXT DEFAULT "[]";"); } catch(e) {}
+try { db.exec("ALTER TABLE products ADD COLUMN images TEXT DEFAULT '[]';"); } catch(e) {}
 try { db.exec("UPDATE products SET sort_order = id WHERE sort_order = 0 OR sort_order IS NULL;"); } catch(e) {}
 
 db.exec(`CREATE TABLE IF NOT EXISTS order_stock_deductions (order_id INTEGER PRIMARY KEY, deducted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE)`);
