@@ -9,6 +9,54 @@ const util = require("util");
 const execFileAsync = util.promisify(execFile);
 
 const app = express();
+
+const { Client: PgClient } = require('pg');
+
+async function syncPg(action) {
+  try {
+    const client = new PgClient({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_URL.includes('dpg-') ? false : { rejectUnauthorized: false }
+    });
+    await client.connect();
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS sqlite_backups (
+        id INT PRIMARY KEY,
+        data BYTEA,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    if (action === 'restore') {
+      const res = await client.query('SELECT data FROM sqlite_backups WHERE id = 1');
+      if (res.rows.length > 0 && res.rows[0].data && res.rows[0].data.length > 0) {
+        fs.writeFileSync(path.join(DATA_DIR, 'loja.sqlite'), res.rows[0].data);
+        console.log('[PostgreSQL] Banco restaurado do PostgreSQL com sucesso!');
+      }
+    } else if (action === 'save') {
+      try { db.exec('PRAGMA wal_checkpoint(TRUNCATE);'); } catch(e) {}
+      const dbFile = path.join(DATA_DIR, 'loja.sqlite');
+      if (fs.existsSync(dbFile)) {
+        const data = fs.readFileSync(dbFile);
+        await client.query(`
+          INSERT INTO sqlite_backups (id, data, updated_at)
+          VALUES (1, , CURRENT_TIMESTAMP)
+          ON CONFLICT (id) DO UPDATE SET data = , updated_at = CURRENT_TIMESTAMP;
+        `, [data]);
+        console.log('[PostgreSQL] Banco salvo com sucesso no PostgreSQL!');
+      }
+    }
+    await client.end();
+  } catch(e) {
+    console.error('[PostgreSQL] Aviso sincronização:', e.message);
+  }
+}
+
+let syncTimeout = null;
+function schedulePgSync() {
+  if (syncTimeout) clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(() => syncPg('save'), 1500);
+}
+
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, "data");
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -804,7 +852,13 @@ app.get("/api/admin/logs",admin,(req,res)=>res.json(db.prepare(`SELECT l.*,u.nam
 
 app.get("*",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
 
-app.listen(PORT,()=>console.log(`Loja online rodando em http://127.0.0.1:${PORT}`));
+(async () => {
+  await syncPg('restore');
+  app.listen(PORT, () => {
+    console.log();
+    schedulePgSync();
+  });
+})();
 
 app.post("/api/admin/products/:id/move", manager, (req, res) => {
   try {
