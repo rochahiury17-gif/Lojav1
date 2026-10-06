@@ -1,12 +1,7 @@
 
-try {
-  db.exec("ALTER TABLE products ADD COLUMN images TEXT;");
-} catch(e) {}
 
-try {
-  db.exec("ALTER TABLE products ADD COLUMN sort_order INTEGER DEFAULT 0;");
-  db.exec("UPDATE products SET sort_order = id WHERE sort_order = 0 OR sort_order IS NULL;");
-} catch(e) {}
+
+
 const express = require("express");
 const session = require("express-session");
 const bcrypt = require("bcryptjs");
@@ -26,6 +21,11 @@ fs.mkdirSync(path.join(__dirname, "public", "templates"), { recursive: true });
 fs.mkdirSync(path.join(__dirname, "public", "uploads"), { recursive: true });
 
 const db = new DatabaseSync(path.join(DATA_DIR, "loja.sqlite"));
+try { db.exec("ALTER TABLE products ADD COLUMN images TEXT;"); } catch(e) {}
+try {
+  db.exec("ALTER TABLE products ADD COLUMN sort_order INTEGER DEFAULT 0;");
+  db.exec("UPDATE products SET sort_order = id WHERE sort_order = 0 OR sort_order IS NULL;");
+} catch(e) {}
 db.exec("PRAGMA journal_mode = WAL");
 db.exec("PRAGMA foreign_keys = ON");
 
