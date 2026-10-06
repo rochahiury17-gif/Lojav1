@@ -225,11 +225,7 @@ async function home(){
   $("#app").innerHTML = `
     ${bannerMarkup()}
     
-    <section class="container" style="margin:16px auto;">
-      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch;">
-        ${categoryMarkup}
-      </div>
-    </section>
+    
 
     ${productSection(more, "Mais produtos", "Continue explorando o catálogo")}
     ${productSection(main, "Destaques", "Produtos selecionados em evidência")}
@@ -355,27 +351,25 @@ async function load(){
   updateCartUI(); renderFooter(); route();
 }
 function bannerMarkup(){
-  const img=store.settings?.banner_image||"/banner/lban.png";
-  const title=store.settings?.banner_title||"Tecnologia que combina com você.";
-  const sub=store.settings?.banner_subtitle||store.settings?.store_description||"Descubra produtos selecionados, ofertas e novidades em um só lugar.";
-  return `<style id="home-display-improvements">
-    /* HOME_DISPLAY_IMPROVEMENTS_V1: banner mais legível e nomes completos */
-    .home-banner{position:relative;min-height:clamp(440px,68vh,680px);display:flex;align-items:center;overflow:hidden}
-    .home-banner-image{object-fit:cover}
-    .home-banner-shade{background:linear-gradient(90deg,rgba(3,7,12,.88) 0%,rgba(3,7,12,.58) 58%,rgba(3,7,12,.2) 100%),linear-gradient(0deg,rgba(3,7,12,.42),transparent 58%)!important}
-    .home-banner-copy{max-width:760px;text-shadow:0 2px 16px rgba(0,0,0,.45)}
-    .home-banner-copy h1{max-width:12ch;line-height:1.04;text-wrap:balance}
-    .home-banner-copy p{max-width:54ch}
-    .product-body h3{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;line-height:1.25;min-height:2.5em}
-    .product-body{display:flex;flex-direction:column}
-    .product-bottom{margin-top:auto}
-    @media(max-width:600px){
-      .home-banner{min-height:560px;min-height:68svh}
-      .home-banner-content{padding-top:40px;padding-bottom:38px}
-      .home-banner-copy h1{font-size:clamp(2.2rem,10vw,3.8rem)}
-      .home-banner-copy p{font-size:1rem}
-    }
-  </style><section class="home-banner"><img class="home-banner-image" src="${img}" alt="MachadoExpress" loading="eager"><div class="home-banner-shade"></div><div class="container home-banner-content"><div class="home-banner-copy"><span class="eyebrow"><i></i> MACHADOEXPRESS · NOVIDADES · OFERTAS</span><h1>${esc(title)}</h1><p>${esc(sub)}</p><div class="hero-actions"><a class="btn primary" href="#/produtos">${esc(store.settings?.banner_button||"Explorar produtos")} <b>→</b></a><a class="btn ghost" href="#/produtos">Ver novidades</a></div><div class="hero-trust"><span>✓ Produtos selecionados</span><span>✓ Compra segura</span><span>✓ Suporte</span></div></div></div></section>`;
+  const img = store.settings?.banner_image || "/banner/lban.png";
+  const title = store.settings?.banner_title || "Tecnologia que combina com você.";
+  const sub = store.settings?.banner_subtitle || store.settings?.store_description || "Descubra produtos selecionados, ofertas e novidades em um só lugar.";
+  const btn = store.settings?.banner_button || "Explorar produtos";
+  
+  return `
+    <section class="home-banner" style="position:relative;width:100%;min-height:360px;background:#060d17;display:flex;align-items:center;overflow:hidden;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:20px;">
+      <div style="position:absolute;inset:0;background-image:url('${img}');background-size:cover;background-position:center;opacity:0.35;"></div>
+      <div style="position:absolute;inset:0;background:linear-gradient(90deg, #060d17 0%, rgba(6,13,23,0.85) 50%, rgba(6,13,23,0.4) 100%);"></div>
+      <div class="container" style="position:relative;z-index:2;padding:36px 16px;">
+        <span style="color:#22d3ee;font-size:10px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;display:inline-block;padding:4px 10px;background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.3);border-radius:20px;margin-bottom:12px;">MACHADOEXPRESS · DESTAQUES</span>
+        <h1 style="font-size:clamp(24px, 5vw, 42px);font-weight:900;color:#fff;line-height:1.15;margin:0 0 10px;max-width:600px;">${esc(title)}</h1>
+        <p style="font-size:14px;color:#94a3b8;line-height:1.5;margin:0 0 18px;max-width:520px;">${esc(sub)}</p>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <a href="#/produtos" class="btn primary" style="padding:10px 18px;font-weight:bold;text-decoration:none;">${esc(btn)} →</a>
+        </div>
+      </div>
+    </section>
+  `;
 }
 function productCard(p){
   const imgHtml = p.image ? `<img src="${esc(p.image)}" alt="${esc(p.name)}">` : `<span>◈</span>`;

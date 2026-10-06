@@ -141,6 +141,20 @@ try { db.exec("UPDATE products SET sort_order = id WHERE sort_order = 0 OR sort_
 
 db.exec(`CREATE TABLE IF NOT EXISTS order_stock_deductions (order_id INTEGER PRIMARY KEY, deducted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE)`);
 
+
+// PERSISTENCIA DE CONFIGURACOES EM ARQUIVO
+const SETTINGS_FILE = path.join(__dirname, "data", "settings.json");
+function loadSavedSettings() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      const saved = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8"));
+      const ins = db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value");
+      for (const [k, v] of Object.entries(saved)) ins.run(k, String(v));
+    }
+  } catch(e) {}
+}
+loadSavedSettings();
+
 const defaults = {
  store_name: "MachadoExpress",
   banner_image: "",
@@ -586,17 +600,27 @@ app.post("/api/admin/suppliers",manager,(req,res)=>{
   const r=db.prepare("INSERT INTO suppliers(name,contact,url,notes) VALUES(?,?,?,?)").run(req.body.name,req.body.contact||"",req.body.url||"",req.body.notes||"");res.json({id:r.lastInsertRowid});
 });
 app.get("/api/admin/settings",admin,(req,res)=>res.json(settings()));
-app.patch("/api/admin/settings",fullAdmin,(req,res)=>{
-  const update=db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value");
+app.patch("/api/admin/settings", admin, (req, res) => {
+  const update = db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value");
   db.exec("BEGIN IMMEDIATE");
   try {
-    for (const [k,v] of Object.entries(req.body || {})) update.run(k,String(v));
+    for (const [k, v] of Object.entries(req.body || {})) {
+      update.run(k, String(v));
+    }
     db.exec("COMMIT");
   } catch (e) {
     try { db.exec("ROLLBACK"); } catch (_) {}
-    throw e;
+    return res.status(500).json({ error: e.message });
   }
-  audit(req.currentUser.id,"settings_updated","Configurações da loja atualizadas");res.json({ok:true});
+
+  try {
+    const current = settings();
+    fs.mkdirSync(path.join(__dirname, "data"), { recursive: true });
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(current, null, 2), "utf8");
+  } catch(e) {}
+
+  audit(req.currentUser.id, "settings_updated", "Configurações da loja atualizadas");
+  res.json({ ok: true });
 });
 app.get("/api/admin/posts", admin, (req,res)=>{
   const rows=db.prepare(`SELECT p.id,p.name,p.price,p.image,p.created_at,
