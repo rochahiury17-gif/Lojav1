@@ -1117,63 +1117,51 @@ window.addEventListener("hashchange",route);load();
 function renderFooter() {
   const f = document.querySelector('#footer');
   if (!f) return;
-  const storeDesc = esc((store.settings && store.settings.store_description) || 'Tecnologia, novidades e produtos selecionados para você.');
-  const footerText = esc((store.settings && store.settings.footer_text) || '© MachadoExpress — Todos os direitos reservados.');
 
   f.innerHTML = `
-    <div class="footer-art-wrapper" style="max-width:1166px;margin:25px auto 10px auto;padding:0 12px;position:relative;">
-      <div style="position:relative;width:100%;border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.5);line-height:0;">
-        <img src="/final.png?v=${Date.now()}" alt="MachadoExpress Informações e Benefícios" style="width:100%;height:auto;display:block;">
+    <div style="max-width:1100px;margin:20px auto 35px auto;padding:0 10px;box-sizing:border-box;">
+      <!-- Arte final2.png com todos os botões clicáveis mapeados -->
+      <div style="position:relative;width:100%;border-radius:16px;overflow:hidden;border:1px solid rgba(0,210,255,0.35);box-shadow:0 12px 35px rgba(0,0,0,0.7);line-height:0;background:#060a12;">
+        <img src="/final2.png?v=${Date.now()}" alt="MachadoExpress Informações e Benefícios" style="width:100%;height:auto;display:block;">
         
-        <!-- 1. Compra Segura -->
-        <a href="politicas.html#seguranca" title="Compra Segura" style="position:absolute;top:2%;left:3%;width:45%;height:13%;display:block;cursor:pointer;z-index:10;"></a>
-        
-        <!-- 2. Entrega Rápida -->
-        <a href="politicas.html#entrega" title="Entrega Rápida" style="position:absolute;top:2%;left:52%;width:45%;height:13%;display:block;cursor:pointer;z-index:10;"></a>
-        
-        <!-- 3. Formas de Pagamento -->
-        <a href="#/produtos" title="Formas de Pagamento" style="position:absolute;top:17%;left:3%;width:45%;height:13%;display:block;cursor:pointer;z-index:10;"></a>
-        
-        <!-- 4. Suporte Especializado (WhatsApp) -->
-        <a href="https://wa.me/5551981884111?text=Ol%C3%A1%2C%20gostaria%20de%20atendimento%20na%20MachadoExpress" target="_blank" rel="noopener" title="Suporte WhatsApp" style="position:absolute;top:17%;left:52%;width:45%;height:13%;display:block;cursor:pointer;z-index:10;"></a>
-        
-        <!-- Política de Privacidade -->
-        <a href="politicas.html#privacidade" title="Política de Privacidade" style="position:absolute;bottom:3%;left:3%;width:28%;height:5%;display:block;cursor:pointer;z-index:10;"></a>
-        
-        <!-- Termos de Uso -->
-        <a href="politicas.html#termos" title="Termos de Uso" style="position:absolute;bottom:3%;left:35%;width:28%;height:5%;display:block;cursor:pointer;z-index:10;"></a>
-        
-        <!-- Atendimento / Suporte -->
-        <a href="https://wa.me/5551981884111?text=Ol%C3%A1%2C%20preciso%20de%20suporte" target="_blank" rel="noopener" title="Atendimento" style="position:absolute;bottom:3%;right:3%;width:28%;height:5%;display:block;cursor:pointer;z-index:10;"></a>
+        <!-- === TOPO === -->
+        <a href="politicas.html#seguranca" title="Compra Segura" style="position:absolute;left:35.3%;top:10.1%;width:9.6%;height:15.1%;display:block;cursor:pointer;z-index:10;"></a>
+        <a href="politicas.html#entrega" title="Entrega Rápida" style="position:absolute;left:45.4%;top:10.1%;width:9.6%;height:15.1%;display:block;cursor:pointer;z-index:10;"></a>
+        <a href="#/produtos" title="Formas de Pagamento" style="position:absolute;left:56.0%;top:10.1%;width:13.1%;height:15.1%;display:block;cursor:pointer;z-index:10;"></a>
+        <a href="https://wa.me/5551981884111?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20na%20MachadoExpress" target="_blank" rel="noopener" title="Suporte Especializado" style="position:absolute;left:70.1%;top:10.1%;width:11.1%;height:15.1%;display:block;cursor:pointer;z-index:10;"></a>
+        <a href="politicas.html#seguranca" title="Sua Compra 100% Segura" style="position:absolute;left:82.2%;top:7.6%;width:16.1%;height:20.2%;display:block;cursor:pointer;z-index:10;"></a>
+
+        <!-- === REDES SOCIAIS (ESQUERDA) === -->
+        <a href="https://wa.me/5551981884111?text=Ol%C3%A1%20MachadoExpress" target="_blank" rel="noopener" title="WhatsApp" style="position:absolute;left:3.0%;top:70.6%;width:3.6%;height:7.6%;display:block;cursor:pointer;z-index:10;"></a>
+        <a href="https://instagram.com" target="_blank" rel="noopener" title="Instagram" style="position:absolute;left:7.5%;top:70.6%;width:3.6%;height:7.6%;display:block;cursor:pointer;z-index:10;"></a>
+        <a href="https://tiktok.com" target="_blank" rel="noopener" title="TikTok" style="position:absolute;left:12.1%;top:70.6%;width:3.1%;height:7.6%;display:block;cursor:pointer;z-index:10;"></a>
+        <a href="https://youtube.com" target="_blank" rel="noopener" title="YouTube" style="position:absolute;left:16.1%;top:70.6%;width:3.6%;height:7.6%;display:block;cursor:pointer;z-index:10;"></a>
+        <a href="https://facebook.com" target="_blank" rel="noopener" title="Facebook" style="position:absolute;left:20.1%;top:70.6%;width:3.6%;height:7.6%;display:block;cursor:pointer;z-index:10;"></a>
+        <a href="https://twitter.com" target="_blank" rel="noopener" title="X (Twitter)" style="position:absolute;left:24.4%;top:70.6%;width:3.3%;height:7.6%;display:block;cursor:pointer;z-index:10;"></a>
+
+        <!-- === COLUNA CENTRAL 1 === -->
+        <a href="politicas.html#privacidade" title="Política de Privacidade" style="position:absolute;left:29.7%;top:35.9%;width:22.0%;height:13.9%;display:block;cursor:pointer;z-index:10;"></a>
+        <a href="politicas.html#seguranca" title="Direitos do Consumidor e Reembolso" style="position:absolute;left:29.7%;top:51.1%;width:22.0%;height:13.9%;display:block;cursor:pointer;z-index:10;"></a>
+        <a href="politicas.html#sobre" title="Sobre Nós" style="position:absolute;left:29.7%;top:66.2%;width:22.0%;height:13.9%;display:block;cursor:pointer;z-index:10;"></a>
+
+        <!-- === COLUNA CENTRAL 2 === -->
+        <a href="politicas.html#termos" title="Termos de Uso" style="position:absolute;left:52.2%;top:35.9%;width:22.0%;height:13.9%;display:block;cursor:pointer;z-index:10;"></a>
+        <a href="https://wa.me/5551981884111?text=Ol%C3%A1%2C%20gostaria%20de%20falar%20com%20o%20atendimento" target="_blank" rel="noopener" title="Fale Conosco" style="position:absolute;left:52.2%;top:51.1%;width:22.0%;height:13.9%;display:block;cursor:pointer;z-index:10;"></a>
+        <a href="#/produtos" title="Mapa do Site / Catálogo" style="position:absolute;left:52.2%;top:66.2%;width:22.0%;height:13.9%;display:block;cursor:pointer;z-index:10;"></a>
+
+        <!-- === CARD GRANDE WHATSAPP (DIREITA) === -->
+        <a href="https://wa.me/5551981884111?text=Ol%C3%A1%2C%20gostaria%20de%20atendimento%20na%20MachadoExpress" target="_blank" rel="noopener" title="Suporte WhatsApp - Fale Conosco" style="position:absolute;left:75.1%;top:35.9%;width:23.0%;height:44.2%;display:block;cursor:pointer;z-index:10;"></a>
+
+        <!-- === BASE DA ARTE (PAGAMENTOS / SITE SEGURO) === -->
+        <a href="#/produtos" title="Formas de Pagamento Aceitas" style="position:absolute;left:3.5%;top:83.2%;width:48.0%;height:8.8%;display:block;cursor:pointer;z-index:10;"></a>
+        <a href="politicas.html#seguranca" title="Site Seguro" style="position:absolute;left:62.0%;top:83.2%;width:16.6%;height:8.8%;display:block;cursor:pointer;z-index:10;"></a>
       </div>
-    </div>
-    
-    <div class="container footer-inner" style="margin-top:20px;">
-      <div>
-        <div class="footer-brand">MACHADO<span>EXPRESS</span></div>
-        <p class="footer-copy">${storeDesc}</p>
+
+      <!-- Barra oficial de titularidade e direitos autorais -->
+      <div style="margin-top:14px;padding:12px;background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.08);border-radius:12px;text-align:center;font-size:11.5px;color:#94a3b8;line-height:1.5;">
+        © 2026 MachadoExpress — Todos os direitos reservados.<br>
+        <strong style="color:#38bdf8;">Titular e Responsável Legal: Hiury Machado Da Rocha</strong>
       </div>
-      <div class="footer-col">
-        <h4>Loja</h4>
-        <a href="#/">Início</a>
-        <a href="#/produtos">Produtos</a>
-        <a href="#/conta">Minha conta</a>
-      </div>
-      <div class="footer-col">
-        <h4>Ajuda</h4>
-        <a href="#/conta">Pedidos</a>
-        <a href="#/login">Entrar</a>
-        <a href="#/registro">Criar conta</a>
-      </div>
-      <div class="footer-col">
-        <h4>Segurança</h4>
-        <a href="politicas.html#seguranca">Compra protegida</a>
-        <a href="politicas.html#privacidade">Privacidade</a>
-        <a href="https://wa.me/5551981884111" target="_blank" rel="noopener">Atendimento</a>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <div class="container">${footerText}</div>
     </div>`;
 }
 
