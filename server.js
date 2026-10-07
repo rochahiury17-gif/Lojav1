@@ -39,8 +39,7 @@ async function syncPg(action) {
         const data = fs.readFileSync(dbFile);
         await client.query(`
           INSERT INTO sqlite_backups (id, data, updated_at)
-          VALUES (1, , CURRENT_TIMESTAMP)
-          ON CONFLICT (id) DO UPDATE SET data = , updated_at = CURRENT_TIMESTAMP;
+          VALUES (1, , CURRENT_TIMESTAMP) ON CONFLICT (id) DO UPDATE SET data = , updated_at = CURRENT_TIMESTAMP;
         `, [data]);
         console.log('[PostgreSQL] Banco salvo com sucesso no PostgreSQL!');
       }
