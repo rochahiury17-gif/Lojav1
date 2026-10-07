@@ -827,3 +827,16 @@ input, textarea, select, .config-form input, .config-form textarea, .config-form
   -webkit-box-shadow: 0 0 0 1000px #111923 inset !important;
   box-shadow: 0 0 0 1000px #111923 inset !important;
 }
+
+
+/* WHATSAPP FLUTUANTE PROFISSIONAL */
+.wa-float-btn {
+}
+.wa-float-btn svg {
+}
+.admin-order-alert {
+}
+#authModal input, .auth-form input {
+}
+#authModal input:focus, .auth-form input:focus {
+}
