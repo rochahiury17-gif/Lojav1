@@ -37,10 +37,7 @@ async function syncPg(action) {
       const dbFile = path.join(DATA_DIR, 'loja.sqlite');
       if (fs.existsSync(dbFile)) {
         const data = fs.readFileSync(dbFile);
-        await client.query(`
-          INSERT INTO sqlite_backups (id, data, updated_at)
-          VALUES (1, , CURRENT_TIMESTAMP) ON CONFLICT (id) DO UPDATE SET data = , updated_at = CURRENT_TIMESTAMP;
-        `, [data]);
+        await client.query('INSERT INTO sqlite_backups (id, data, updated_at) VALUES (1, $1, CURRENT_TIMESTAMP) ON CONFLICT (id) DO UPDATE SET data = $1, updated_at = CURRENT_TIMESTAMP;', [data]);
         console.log('[PostgreSQL] Banco salvo com sucesso no PostgreSQL!');
       }
     }
@@ -608,6 +605,7 @@ app.post("/api/admin/products/import", admin, (req, res) => {
       );
       count++;
     }
+    schedulePgSync(); // hook_import
     res.json({ ok: true, imported: count });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -721,6 +719,7 @@ app.patch("/api/admin/settings", admin, (req, res) => {
   } catch(e) {}
 
   audit(req.currentUser.id, "settings_updated", "Configurações da loja atualizadas");
+    schedulePgSync(); // hook_settings
   res.json({ ok: true });
 });
 app.get("/api/admin/posts", admin, (req,res)=>{

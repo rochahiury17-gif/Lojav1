@@ -192,10 +192,9 @@ window.renderPhotoThumbnails = function(list, targetContainerId, inputFieldId) {
 
 async function home(){
   const [ps,cats]=await Promise.all([api("/api/products"),api("/api/categories")]);
-  // HOME_DEDUPLICATION_V2: esconde duplicados por nome e preço apenas na vitrine.
   const homeSeen=new Set();
   const homeProducts=ps.filter(p=>{
-    const name=String(p.name||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+    const name=String(p.name||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
     const key=name+"|"+Number(p.price||0).toFixed(2);
     if(homeSeen.has(key))return false;
     homeSeen.add(key);
@@ -204,31 +203,67 @@ async function home(){
   const featured=homeProducts.filter(p=>p.featured).slice(0,10);
   const main=featured.length?featured:homeProducts.slice(0,10);
   const more=homeProducts.filter(p=>!main.some(x=>x.id===p.id)).slice(0,10);
-  
-  const categoryMarkup = cats.map(c=>`<a href="#/produtos?cat=${encodeURIComponent(c.slug)}" style="flex:0 0 auto;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:#cbd5e1;padding:8px 14px;border-radius:20px;font-size:11px;font-weight:bold;text-decoration:none;white-space:nowrap;"><span>◈</span> ${esc(c.name)}</a>`).join("");
 
-  const productSection=(items,title,sub)=>items.length?`
-    <section class="container" style="margin-bottom:28px;">
-      <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px;">
-        <div>
-          <span style="color:#22d3ee;font-size:9px;font-weight:900;letter-spacing:1px;text-transform:uppercase;">${title==="Mais procurados"?"FAVORITOS DA LOJA":"SELEÇÃO ESPECIAL"}</span>
-          <h2 style="font-size:20px;font-weight:800;margin:2px 0 0;color:#fff;">${title}</h2>
+  const trustBar = `
+    <section class="container" style="margin: 16px auto 24px; padding: 0 10px;">
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:12px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:22px;">🛡️</span>
+          <div><b style="font-size:12px;color:#fff;display:block;">Compra 100% Segura</b><span style="font-size:10px;color:#94a3b8;">Garantia e procedência</span></div>
         </div>
-        <a href="#/produtos" style="color:#22d3ee;font-size:11px;font-weight:bold;text-decoration:none;">Ver todos →</a>
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:12px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:22px;">⚡</span>
+          <div><b style="font-size:12px;color:#fff;display:block;">Envio Imediato</b><span style="font-size:10px;color:#94a3b8;">Rastreio em tempo real</span></div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:12px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:22px;">💳</span>
+          <div><b style="font-size:12px;color:#fff;display:block;">Pix com Desconto</b><span style="font-size:10px;color:#94a3b8;">Aprovação instantânea</span></div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:12px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:22px;">💬</span>
+          <div><b style="font-size:12px;color:#fff;display:block;">Suporte Humanizado</b><span style="font-size:10px;color:#94a3b8;">Direto no WhatsApp</span></div>
+        </div>
       </div>
-      <div class="home-product-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+    </section>
+  `;
+
+  const categoryCards = cats.length ? `
+    <section class="container" style="margin-bottom: 24px; padding: 0 10px;">
+      <h3 style="font-size:14px;color:#cbd5e1;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;font-weight:700;">Categorias</h3>
+      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;">
+        ${cats.map(c => `<a href="#/produtos?cat=${encodeURIComponent(c.slug)}" style="flex:0 0 auto;background:#131c26;border:1px solid #223244;color:#38bdf8;padding:8px 16px;border-radius:24px;font-size:12px;font-weight:700;text-decoration:none;">${esc(c.name)}</a>`).join('')}
+      </div>
+    </section>
+  ` : '';
+
+  const productSection = (items, title) => items.length ? `
+    <section class="container" style="margin-bottom:28px; padding: 0 10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <h2 style="font-size:18px;font-weight:800;margin:0;color:#fff;">${title}</h2>
+        <a href="#/produtos" style="color:#22d3ee;font-size:12px;font-weight:bold;text-decoration:none;">Ver todos →</a>
+      </div>
+      <div class="home-product-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
         ${items.map(productCard).join("")}
       </div>
     </section>
-  `:"";
+  ` : '';
+
+  const emptyNotice = (!homeProducts.length) ? `
+    <section class="container" style="text-align:center;padding:36px 16px;background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.1);border-radius:14px;margin:20px 10px 30px;">
+      <span style="font-size:36px;display:block;margin-bottom:10px;">📦</span>
+      <h3 style="color:#fff;font-size:16px;margin:0 0 6px;">Catálogo em atualização</h3>
+      <p style="color:#94a3b8;font-size:12px;margin:0 0 16px;">Novidades exclusivas chegando à MachadoExpress.</p>
+      <a href="https://wa.me/5551981884111?text=Ol%C3%A1%2C%20gostaria%20de%20consultar%20produtos%20dispon%C3%ADveis" target="_blank" style="background:#25D366;color:#fff;padding:10px 20px;border-radius:24px;font-weight:bold;font-size:12px;text-decoration:none;display:inline-block;">Consultar no WhatsApp</a>
+    </section>
+  ` : '';
 
   $("#app").innerHTML = `
     ${bannerMarkup()}
-    
-    
-
-    ${productSection(more, "Mais produtos", "Continue explorando o catálogo")}
-    ${productSection(main, "Destaques", "Produtos selecionados em evidência")}
+    ${trustBar}
+    ${categoryCards}
+    ${productSection(main, "Destaques")}
+    ${productSection(more, "Mais Produtos")}
+    ${emptyNotice}
   `;
   updateCartUI();
 }
