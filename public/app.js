@@ -395,12 +395,10 @@ async function load(){
 }
 function bannerMarkup() {
   return `
-    <section class="home-banner-clean" style="max-width:1200px;margin:12px auto 20px auto;padding:0 10px;box-sizing:border-box;">
-      <div style="width:100%;border-radius:18px;overflow:hidden;border:1px solid rgba(0,210,255,0.3);box-shadow:0 12px 35px rgba(0,0,0,0.6);line-height:0;background:#060d17;">
-        <a href="#/produtos" title="Ver catálogo de produtos" style="display:block;width:100%;cursor:pointer;">
-          <img src="/banner2.png?v=${Date.now()}" alt="MachadoExpress Banner" style="width:100%;height:auto;display:block;object-fit:cover;">
-        </a>
-      </div>
+    <section class="home-banner-full" style="width:100%;margin:0 0 16px 0;padding:0;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.6);line-height:0;background:#060d17;">
+      <a href="#/produtos" title="Ver catálogo de produtos" style="display:block;width:100%;cursor:pointer;line-height:0;margin:0;padding:0;">
+        <img src="/banner2.png?v=${Date.now()}" alt="MachadoExpress Banner" style="width:100%;height:auto;display:block;margin:0;padding:0;border:none;">
+      </a>
     </section>`;
 }
 function productCard(p){
@@ -1108,10 +1106,9 @@ function renderFooter() {
   if (!f) return;
 
   f.innerHTML = `
-    <div style="max-width:1100px;margin:20px auto 35px auto;padding:0 10px;box-sizing:border-box;">
-      <!-- Arte final2.png com todos os botões clicáveis mapeados -->
-      <div style="position:relative;width:100%;border-radius:16px;overflow:hidden;border:1px solid rgba(0,210,255,0.35);box-shadow:0 12px 35px rgba(0,0,0,0.7);line-height:0;background:#060a12;">
-        <img src="/final2.png?v=${Date.now()}" alt="MachadoExpress Informações e Benefícios" style="width:100%;height:auto;display:block;">
+    <div style="width:100%;margin:20px 0 30px 0;padding:0;box-sizing:border-box;">
+      <div style="position:relative;width:100%;overflow:hidden;border-top:1px solid rgba(0,210,255,0.35);border-bottom:1px solid rgba(0,210,255,0.35);box-shadow:0 12px 35px rgba(0,0,0,0.7);line-height:0;background:#060a12;">
+        <img src="/final2.png?v=${Date.now()}" alt="MachadoExpress Informações e Benefícios" style="width:100%;height:auto;display:block;margin:0;padding:0;border:none;">
         
         <!-- === TOPO === -->
         <a href="politicas.html#seguranca" title="Compra Segura" style="position:absolute;left:35.3%;top:10.1%;width:9.6%;height:15.1%;display:block;cursor:pointer;z-index:10;"></a>
@@ -1146,8 +1143,7 @@ function renderFooter() {
         <a href="politicas.html#seguranca" title="Site Seguro" style="position:absolute;left:62.0%;top:83.2%;width:16.6%;height:8.8%;display:block;cursor:pointer;z-index:10;"></a>
       </div>
 
-      <!-- Barra oficial de titularidade e direitos autorais -->
-      <div style="margin-top:14px;padding:12px;background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.08);border-radius:12px;text-align:center;font-size:11.5px;color:#94a3b8;line-height:1.5;">
+      <div style="margin:14px 12px 0 12px;padding:12px;background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.08);border-radius:12px;text-align:center;font-size:11.5px;color:#94a3b8;line-height:1.5;">
         © 2026 MachadoExpress — Todos os direitos reservados.<br>
         <strong style="color:#38bdf8;">Titular e Responsável Legal: Hiury Machado Da Rocha</strong>
       </div>
