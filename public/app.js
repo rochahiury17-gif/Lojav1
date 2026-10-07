@@ -393,26 +393,15 @@ async function load(){
   admin.style.display=isAdmin?"inline":"none";ma.style.display=isAdmin?"block":"none";
   updateCartUI(); renderFooter(); route();
 }
-function bannerMarkup(){
-  const img = store.settings?.banner_image || "/banner/lban.png";
-  const title = store.settings?.banner_title || "Tecnologia que combina com você.";
-  const sub = store.settings?.banner_subtitle || store.settings?.store_description || "Descubra produtos selecionados, ofertas e novidades em um só lugar.";
-  const btn = store.settings?.banner_button || "Explorar produtos";
-  
+function bannerMarkup() {
   return `
-    <section class="home-banner" style="position:relative;width:100%;min-height:360px;background:#060d17;display:flex;align-items:center;overflow:hidden;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:20px;">
-      <div style="position:absolute;inset:0;background-image:url('${img}');background-size:cover;background-position:center;opacity:0.35;"></div>
-      <div style="position:absolute;inset:0;background:linear-gradient(90deg, #060d17 0%, rgba(6,13,23,0.85) 50%, rgba(6,13,23,0.4) 100%);"></div>
-      <div class="container" style="position:relative;z-index:2;padding:36px 16px;">
-        <span style="color:#22d3ee;font-size:10px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;display:inline-block;padding:4px 10px;background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.3);border-radius:20px;margin-bottom:12px;">MACHADOEXPRESS · DESTAQUES</span>
-        <h1 style="font-size:clamp(24px, 5vw, 42px);font-weight:900;color:#fff;line-height:1.15;margin:0 0 10px;max-width:600px;">${esc(title)}</h1>
-        <p style="font-size:14px;color:#94a3b8;line-height:1.5;margin:0 0 18px;max-width:520px;">${esc(sub)}</p>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-          <a href="#/produtos" class="btn primary" style="padding:10px 18px;font-weight:bold;text-decoration:none;">${esc(btn)} →</a>
-        </div>
+    <section class="home-banner-clean" style="max-width:1200px;margin:12px auto 20px auto;padding:0 10px;box-sizing:border-box;">
+      <div style="width:100%;border-radius:18px;overflow:hidden;border:1px solid rgba(0,210,255,0.3);box-shadow:0 12px 35px rgba(0,0,0,0.6);line-height:0;background:#060d17;">
+        <a href="#/produtos" title="Ver catálogo de produtos" style="display:block;width:100%;cursor:pointer;">
+          <img src="/banner2.png?v=${Date.now()}" alt="MachadoExpress Banner" style="width:100%;height:auto;display:block;object-fit:cover;">
+        </a>
       </div>
-    </section>
-  `;
+    </section>`;
 }
 function productCard(p){
   const imgHtml = p.image ? `<img src="${esc(p.image)}" alt="${esc(p.name)}">` : `<span>◈</span>`;
