@@ -840,3 +840,36 @@ input, textarea, select, .config-form input, .config-form textarea, .config-form
 }
 #authModal input:focus, .auth-form input:focus {
 }
+
+/* Alerta de novo pedido fixo no topo para Admin */
+.admin-order-alert {
+  position: fixed !important;
+  top: 12px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: calc(100% - 24px) !important;
+  max-width: 520px !important;
+  z-index: 999999 !important;
+  background: linear-gradient(135deg, #0b1626 0%, #0e2a4d 100%) !important;
+  border: 2px solid #22d3ee !important;
+  box-shadow: 0 12px 35px rgba(0,0,0,.85), 0 0 25px rgba(34,211,238,.5) !important;
+  border-radius: 14px !important;
+  padding: 13px 14px !important;
+  color: #fff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  animation: adminAlertSlideDown .35s ease-out !important;
+  box-sizing: border-box !important;
+}
+@keyframes adminAlertSlideDown {
+  from { opacity: 0; transform: translate(-50%, -30px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.admin-order-alert-content { display:flex; align-items:center; gap:10px; flex:1; min-width:0; cursor:pointer; }
+.admin-order-alert-icon { font-size:26px; line-height:1; flex-shrink:0; }
+.admin-order-alert-title { display:block; font-size:14px; font-weight:800; color:#38bdf8; text-transform:uppercase; }
+.admin-order-alert-sub { display:block; font-size:13px; color:#f1f5f9; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.admin-order-alert-btn { background:#22d3ee !important; color:#041019 !important; border:none !important; border-radius:8px !important; padding:8px 12px !important; font-size:12px !important; font-weight:800 !important; cursor:pointer !important; text-transform:uppercase !important; }
+.admin-order-alert-close { background:rgba(255,255,255,.14) !important; color:#cbd5e1 !important; border:none !important; border-radius:8px !important; width:30px !important; height:30px !important; display:inline-flex !important; align-items:center !important; justify-content:center !important; font-size:15px !important; font-weight:bold !important; cursor:pointer !important; }

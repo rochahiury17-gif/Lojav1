@@ -957,15 +957,33 @@ function adminOrderRender(){
   const mode=sort?.value||window.__adminOrderSort||"recent";
   window.__adminOrderSort=mode;
   shown.sort((a,b)=>mode==="old"?Number(a.id)-Number(b.id):mode==="total-high"?Number(b.total)-Number(a.total):mode==="total-low"?Number(a.total)-Number(b.total):Number(b.id)-Number(a.id));
+  window.__adminShownOrderIds = shown.map(o => Number(o.id));
   if(!shown.length){
     host.innerHTML=`<div class="panel" style="text-align:center;padding:24px"><h3>Nenhum pedido encontrado</h3><p style="color:#94a3b8">Tente mudar o filtro ou a busca.</p></div>`;
     return;
   }
   const statuses=["pending","paid","processing","shipped","delivered","cancelled","refunded"];
-  host.innerHTML=shown.map(o=>`<article style="margin:0 0 12px;padding:15px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(255,255,255,.035);overflow:hidden">
+  const bulkBar = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px 14px;margin-bottom:14px;flex-wrap:wrap">
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:700;cursor:pointer;color:#e2e8f0;user-select:none">
+        <input type="checkbox" id="adminSelectAllOrdersCheckbox" onchange="adminToggleSelectAllOrders(this.checked)" style="width:19px;height:19px;accent-color:#22d3ee;cursor:pointer" />
+        Selecionar todos (<span id="adminSelectedOrdersCount">${window.__selectedOrderIds.size}</span>)
+      </label>
+      <button id="adminBulkDeleteBtn" type="button" onclick="adminBulkDeleteOrders()" style="display:${window.__selectedOrderIds.size > 0 ? "inline-flex" : "none"};align-items:center;gap:6px;background:#ef4444;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer">
+        🗑️ Excluir selecionados
+      </button>
+    </div>
+  `;
+  host.innerHTML=bulkBar + shown.map(o=>`<article style="margin:0 0 12px;padding:15px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(255,255,255,.035);overflow:hidden">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:11px">
-      <div><b style="font-size:16px">Pedido #${esc(o.id)}</b><small style="display:block;color:#94a3b8;margin-top:4px">${esc(adminOrderDate(o.created_at))}</small></div>
-      <strong style="color:#67e8f9;font-size:18px">${money(o.total)}</strong>
+      <div style="display:flex;align-items:center;gap:12px">
+              <input type="checkbox" class="admin-order-checkbox" data-order-id="${o.id}" onchange="adminToggleSelectOrder(${o.id}, this.checked)" style="width:19px;height:19px;accent-color:#22d3ee;cursor:pointer" ${window.__selectedOrderIds.has(Number(o.id)) ? "checked" : ""} />
+              <div><b style="font-size:16px">Pedido #${esc(o.id)}</b><small style="display:block;color:#94a3b8;margin-top:4px">${esc(adminOrderDate(o.created_at))}</small></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <strong style="color:#67e8f9;font-size:18px">${money(o.total)}</strong>
+              <button type="button" onclick="adminDeleteSingleOrder(${o.id})" title="Excluir Pedido #${esc(o.id)}" style="background:rgba(239,68,68,.12);border:1px solid #ef4444;color:#f87171;border-radius:8px;padding:6px 9px;font-size:13px;cursor:pointer">🗑️</button>
+            </div>
     </div>
     <div style="padding:12px 0"><b>${esc(o.customer_name||"Cliente")}</b><small style="display:block;color:#94a3b8;overflow-wrap:anywhere">${esc(o.customer_email||"")}</small>
       <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px">
@@ -1945,21 +1963,27 @@ function checkAdminNewOrders() {
   }).catch(() => {});
 }
 function showOrderNotification(o) {
-  const existing = document.getElementById("admin-order-alert-box");
-  if (existing) existing.remove();
+  if (!o) return;
+  const oldOne = document.getElementById("admin-order-alert-box");
+  if (oldOne) oldOne.remove();
   const div = document.createElement("div");
   div.id = "admin-order-alert-box";
   div.className = "admin-order-alert";
   div.innerHTML = `
-    <span style="font-size:24px;">🛍️🔔</span>
-    <div>
-      <b style="display:block;font-size:13px;text-transform:uppercase;">Novo Pedido #${o.id}!</b>
-      <span style="font-size:12px;">Total: <b>${money(o.total)}</b> · ${esc(o.customer_name||"Cliente")}</span>
+    <div class="admin-order-alert-content" onclick="window.location.hash='#/admin/pedidos';this.closest('.admin-order-alert').remove()">
+      <div class="admin-order-alert-icon">🔔🛍️</div>
+      <div style="min-width:0;flex:1">
+        <span class="admin-order-alert-title">NOVO PEDIDO #${o.id || ""}!</span>
+        <span class="admin-order-alert-sub">${typeof money === "function" ? money(o.total) : ("R$ " + (o.total || 0))} · ${esc(o.customer_name || "Cliente")}</span>
+      </div>
     </div>
-    <button onclick="this.parentElement.remove();location.hash='#/admin/pedidos'" style="background:#fff;color:#065f46;border:none;padding:6px 12px;border-radius:6px;font-weight:bold;font-size:11px;cursor:pointer;margin-left:8px;">VER</button>
+    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <button type="button" class="admin-order-alert-btn" onclick="window.location.hash='#/admin/pedidos';this.closest('.admin-order-alert').remove()">VER</button>
+      <button type="button" class="admin-order-alert-close" onclick="this.closest('.admin-order-alert').remove()" title="Fechar">✕</button>
+    </div>
   `;
   document.body.appendChild(div);
-  setTimeout(() => { if (div.parentElement) div.remove(); }, 12000);
+  setTimeout(() => { if (div && div.parentNode) div.remove(); }, 12000);
 }
 if (!window.__orderPollInterval) {
   window.__orderPollInterval = setInterval(checkAdminNewOrders, 8000);
@@ -2089,19 +2113,7 @@ function startAdminOrderMonitor() {
   }, 10000);
 }
 
-function showNewOrderBanner(order) {
-  const existing = document.querySelector('.admin-order-alert');
-  if (existing) existing.remove();
-  const alert = document.createElement('div');
-  alert.className = 'admin-order-alert';
-  alert.innerHTML = '🔔 🛍️ <b>NOVO PEDIDO #' + (order.id || '') + '!</b> Toque para ver';
-  alert.onclick = () => {
-    window.location.hash = '#/admin/pedidos';
-    alert.remove();
-  };
-  document.body.appendChild(alert);
-  setTimeout(() => { if (alert.parentNode) alert.remove(); }, 8000);
-}
+function showNewOrderBanner(o) { showOrderNotification(o); }
 
 window.copyPixKey = function(keyText) {
   navigator.clipboard.writeText(keyText).then(() => {
@@ -2131,3 +2143,49 @@ if (document.readyState === 'loading') {
   setupFloatingWhatsApp();
   startAdminOrderMonitor();
 }
+
+
+// Selecao e exclusao de pedidos (Admin)
+window.__selectedOrderIds = window.__selectedOrderIds || new Set();
+window.adminToggleSelectAllOrders = function(check) {
+  const shownIds = window.__adminShownOrderIds || [];
+  shownIds.forEach(id => { if (check) window.__selectedOrderIds.add(Number(id)); else window.__selectedOrderIds.delete(Number(id)); });
+  window.adminSyncOrderSelectionUI();
+};
+window.adminToggleSelectOrder = function(id, check) {
+  id = Number(id);
+  if (check) window.__selectedOrderIds.add(id); else window.__selectedOrderIds.delete(id);
+  window.adminSyncOrderSelectionUI();
+};
+window.adminSyncOrderSelectionUI = function() {
+  const shownIds = window.__adminShownOrderIds || [];
+  const count = window.__selectedOrderIds.size;
+  const allBox = document.getElementById("adminSelectAllOrdersCheckbox");
+  if (allBox) allBox.checked = shownIds.length > 0 && shownIds.every(id => window.__selectedOrderIds.has(Number(id)));
+  const counter = document.getElementById("adminSelectedOrdersCount");
+  if (counter) counter.textContent = count;
+  const btn = document.getElementById("adminBulkDeleteBtn");
+  if (btn) btn.style.display = count > 0 ? "inline-flex" : "none";
+  document.querySelectorAll(".admin-order-checkbox").forEach(cb => { cb.checked = window.__selectedOrderIds.has(Number(cb.dataset.orderId)); });
+};
+window.adminDeleteSingleOrder = async function(orderId) {
+  orderId = Number(orderId);
+  if (!confirm("Excluir o Pedido #" + orderId + "? Essa acao e permanente.")) return;
+  try {
+    const res = await api("/api/admin/orders/" + orderId, { method: "DELETE" });
+    window.__selectedOrderIds.delete(orderId);
+    if (typeof toast === "function") toast(res.message || "Pedido excluido!", "ok");
+    adminOrders();
+  } catch(err) { alert((err && err.message) || "Erro ao excluir pedido."); }
+};
+window.adminBulkDeleteOrders = async function() {
+  const ids = Array.from(window.__selectedOrderIds);
+  if (!ids.length) { alert("Nenhum pedido selecionado."); return; }
+  if (!confirm("Excluir " + ids.length + " pedido(s) selecionado(s)? Essa acao e permanente.")) return;
+  try {
+    const res = await api("/api/admin/orders/bulk-delete", { method: "POST", body: JSON.stringify({ ids }) });
+    window.__selectedOrderIds.clear();
+    if (typeof toast === "function") toast(res.message || "Pedidos excluidos!", "ok");
+    adminOrders();
+  } catch(err) { alert((err && err.message) || "Erro ao excluir pedidos."); }
+};

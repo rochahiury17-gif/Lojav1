@@ -711,6 +711,55 @@ app.patch("/api/admin/products/:id",manager,(req,res)=>{
 });
 app.delete("/api/admin/products/:id",manager,(req,res)=>{db.prepare("DELETE FROM products WHERE id=?").run(req.params.id);res.json({ok:true});});
 
+
+// Exclusao individual de pedido (Admin)
+app.delete("/api/admin/orders/:id", admin, (req, res) => {
+  const orderId = Number(req.params.id);
+  if (!Number.isInteger(orderId) || orderId < 1) return res.status(400).json({ error: "Numero do pedido invalido." });
+  let tOpen = false;
+  try {
+    db.exec("BEGIN IMMEDIATE"); tOpen = true;
+    const order = db.prepare("SELECT id FROM orders WHERE id = ?").get(orderId);
+    if (!order) { db.exec("ROLLBACK"); tOpen = false; return res.status(404).json({ error: "Pedido nao encontrado." }); }
+    try { db.prepare("DELETE FROM order_stock_deductions WHERE order_id = ?").run(orderId); } catch(e) {}
+    db.prepare("DELETE FROM order_items WHERE order_id = ?").run(orderId);
+    db.prepare("DELETE FROM orders WHERE id = ?").run(orderId);
+    db.exec("COMMIT"); tOpen = false;
+    if (typeof schedulePgBackup === "function") schedulePgBackup("admin delete order #" + orderId);
+    return res.json({ success: true, message: "Pedido #" + orderId + " excluido com sucesso." });
+  } catch(err) {
+    if (tOpen) try { db.exec("ROLLBACK"); } catch(e) {}
+    console.error("Erro ao excluir pedido:", err);
+    return res.status(500).json({ error: "Nao foi possivel excluir o pedido." });
+  }
+});
+
+// Exclusao em massa de pedidos (Admin)
+app.post("/api/admin/orders/bulk-delete", admin, (req, res) => {
+  const ids = Array.isArray(req.body && req.body.ids) ? req.body.ids.map(Number).filter(n => Number.isInteger(n) && n > 0) : [];
+  if (!ids.length) return res.status(400).json({ error: "Nenhum pedido valido selecionado." });
+  let tOpen = false;
+  try {
+    db.exec("BEGIN IMMEDIATE"); tOpen = true;
+    const delDed = db.prepare("DELETE FROM order_stock_deductions WHERE order_id = ?");
+    const delItems = db.prepare("DELETE FROM order_items WHERE order_id = ?");
+    const delOrder = db.prepare("DELETE FROM orders WHERE id = ?");
+    let deletedCount = 0;
+    for (const id of ids) {
+      try { delDed.run(id); } catch(e) {}
+      delItems.run(id);
+      if (delOrder.run(id).changes > 0) deletedCount++;
+    }
+    db.exec("COMMIT"); tOpen = false;
+    if (typeof schedulePgBackup === "function") schedulePgBackup("admin bulk delete " + deletedCount + " orders");
+    return res.json({ success: true, deletedCount, message: deletedCount + " pedido(s) excluido(s) com sucesso." });
+  } catch(err) {
+    if (tOpen) try { db.exec("ROLLBACK"); } catch(e) {}
+    console.error("Erro na exclusao em massa:", err);
+    return res.status(500).json({ error: "Nao foi possivel excluir os pedidos selecionados." });
+  }
+});
+
 app.get("/api/admin/customers", admin, (req, res) => {
   try {
     const sql = `
