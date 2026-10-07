@@ -1,5 +1,6 @@
 const express = require("express");
 const session = require("express-session");
+const pgSession = require("connect-pg-simple")(session);
 const bcrypt = require("bcryptjs");
 const { DatabaseSync } = require("node:sqlite");
 const path = require("path");
@@ -10,7 +11,16 @@ const execFileAsync = util.promisify(execFile);
 
 const app = express();
 
-const { Client: PgClient } = require('pg');
+const { Client: PgClient, Pool } = require('pg');
+
+const pool = process.env.DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_URL.includes('dpg-')
+        ? false
+        : { rejectUnauthorized: false }
+    })
+  : null;
 
 async function syncPg(action) {
   try {
@@ -274,12 +284,62 @@ if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
 }
 app.set("trust proxy", 1);
 app.use(session({
+  store: process.env.DATABASE_URL && pool
+    ? new pgSession({
+        pool: pool,
+        tableName: "user_sessions",
+        createTableIfMissing: true
+      })
+    : undefined,
   secret: process.env.SESSION_SECRET || "dev-only-local-session-secret",
-  resave:false,
-  saveUninitialized:false,
-  cookie:{httpOnly:true, sameSite:"lax", secure: process.env.NODE_ENV === "production", maxAge:1000*60*60*24*7}
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 1000 * 60 * 60 * 24 * 7
+  }
 }));
 app.use(express.static(path.join(__dirname,"public")));
+
+// ============================================================
+// PERSISTÊNCIA AUTOMÁTICA
+// ============================================================
+// Qualquer rota que altere dados dispara um backup do SQLite
+// para o PostgreSQL depois que a resposta termina.
+// Isso cobre POST, PUT, PATCH e DELETE sem precisar colocar
+// schedulePgSync() manualmente em cada rota.
+
+app.use((req, res, next) => {
+  const method = String(req.method || "").toUpperCase();
+
+  const mutatingMethods = new Set([
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE"
+  ]);
+
+  if (!mutatingMethods.has(method)) {
+    return next();
+  }
+
+  res.on("finish", () => {
+    // Só sincroniza depois de uma resposta bem-sucedida.
+    if (res.statusCode >= 200 && res.statusCode < 400) {
+      schedulePgSync();
+    }
+  });
+
+  next();
+});
+
+// ============================================================
+// FIM DA PERSISTÊNCIA AUTOMÁTICA
+// ============================================================
+
+
 
 function setting(key){ return db.prepare("SELECT value FROM settings WHERE key=?").get(key)?.value ?? ""; }
 
@@ -850,13 +910,12 @@ app.get("/api/admin/logs",admin,(req,res)=>res.json(db.prepare(`SELECT l.*,u.nam
 
 app.get("*",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
 
-(async () => {
-  await syncPg('restore');
-  app.listen(PORT, () => {
-    console.log();
-    schedulePgSync();
-  });
-})();
+app.listen(PORT, () => {
+  console.log();
+  console.log("[Machado Express] Servidor iniciado na porta " + PORT);
+  console.log("[PostgreSQL] Persistência automática ativada.");
+  schedulePgSync();
+});
 
 app.post("/api/admin/products/:id/move", manager, (req, res) => {
   try {

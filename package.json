@@ -5,13 +5,14 @@
   "description": "Loja online tech premium para Termux",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node bootstrap.js",
     "dev": "node --watch server.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "express": "^4.21.2",
     "express-session": "^1.18.1",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "connect-pg-simple": "^10.0.0"
   }
 }
