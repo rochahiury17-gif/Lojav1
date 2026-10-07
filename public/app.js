@@ -1956,3 +1956,107 @@ window.openCustomerDetails = async function(id) {
     toast("Erro ao carregar detalhes", "warn");
   }
 };
+
+
+// ULTRA ATUALIZACAO - CLIENT ENGINE
+window.compressImage = function(file, maxWidth = 1200, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
+window.playOrderAlertSound = function() {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.45);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.45);
+  } catch(e) {}
+};
+
+let lastKnownOrdersCount = null;
+function startAdminOrderMonitor() {
+  setInterval(async () => {
+    try {
+      const res = await fetch('/api/admin/orders');
+      const orders = await res.json();
+      if (Array.isArray(orders)) {
+        if (lastKnownOrdersCount !== null && orders.length > lastKnownOrdersCount) {
+          window.playOrderAlertSound();
+          showNewOrderBanner(orders[0] || { id: 'Novo' });
+        }
+        lastKnownOrdersCount = orders.length;
+      }
+    } catch(e) {}
+  }, 10000);
+}
+
+function showNewOrderBanner(order) {
+  const existing = document.querySelector('.admin-order-alert');
+  if (existing) existing.remove();
+  const alert = document.createElement('div');
+  alert.className = 'admin-order-alert';
+  alert.innerHTML = '🔔 🛍️ <b>NOVO PEDIDO #' + (order.id || '') + '!</b> Toque para ver';
+  alert.onclick = () => {
+    window.location.hash = '#/admin/pedidos';
+    alert.remove();
+  };
+  document.body.appendChild(alert);
+  setTimeout(() => { if (alert.parentNode) alert.remove(); }, 8000);
+}
+
+window.copyPixKey = function(keyText) {
+  navigator.clipboard.writeText(keyText).then(() => {
+    alert('✅ Chave Pix copiada com sucesso!');
+  });
+};
+
+function setupFloatingWhatsApp() {
+  if (document.querySelector('.wa-float-btn')) return;
+  const btn = document.createElement('a');
+  btn.className = 'wa-float-btn';
+  btn.href = 'https://wa.me/5551981884111?text=Ol%C3%A1%2C%20gostaria%20de%20tirar%20uma%20d%C3%BAvida%20sobre%20a%20loja%20MachadoExpress!';
+  btn.target = '_blank';
+  btn.title = 'Fale conosco no WhatsApp';
+  btn.innerHTML = '💬';
+  document.body.appendChild(btn);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    setupFloatingWhatsApp();
+    startAdminOrderMonitor();
+  });
+} else {
+  setupFloatingWhatsApp();
+  startAdminOrderMonitor();
+}
