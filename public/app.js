@@ -1114,7 +1114,68 @@ async function adminConfig(){if(!await requireAdmin(true))return;let s=await api
 async function saveSettings(e){e.preventDefault();try{const fd=new FormData(e.target);const body=Object.fromEntries(fd.entries());const banner=fd.get("banner_file");delete body.banner_file;if(banner&&banner.size>0){body.banner_image=await uploadLocalImage(banner)}else{delete body.banner_image;}await api("/api/admin/settings",{method:"PATCH",body:JSON.stringify(body)});await load();toast("Configurações salvas com sucesso!");location.hash="#/admin/config"}catch(x){console.error(x);toast(x.message||"Erro ao salvar configurações","warn");}}
 async function route(){let h=location.hash||"#/";try{if(h==="#/"||h==="#")return await home();if(h.startsWith("#/produtos"))return await products();if(h==="#/login")return await login();if(h==="#/registro")return await register();if(h==="#/conta")return await account();if(h==="#/admin")return await admin();if(h==="#/admin/produtos")return await adminProducts();if(h==="#/admin/pedidos")return await adminOrders();if(h==="#/admin/clientes")return await adminCustomers();if(h==="#/admin/equipe")return await adminTeam();if(h==="#/admin/config")return await adminConfig();if(h==="#/admin/posts")return await adminPosts();return await home()}catch(e){toast(e.message,"warn")}}
 window.addEventListener("hashchange",route);load();
-function renderFooter(){let f=$("#footer");if(!f)return;f.innerHTML=`<div class="container footer-inner"><div><div class="footer-brand">MINHA<span>LOJA</span></div><p class="footer-copy">${esc(store.settings.store_description||"Tecnologia, novidades e produtos selecionados para você.")}</p></div><div class="footer-col"><h4>Loja</h4><a href="#/">Início</a><a href="#/produtos">Produtos</a><a href="#/conta">Minha conta</a></div><div class="footer-col"><h4>Ajuda</h4><a href="#/conta">Pedidos</a><a href="#/login">Entrar</a><a href="#/registro">Criar conta</a></div><div class="footer-col"><h4>Segurança</h4><a>Compra protegida</a><a>Privacidade</a><a>Atendimento</a></div></div><div class="footer-bottom"><div class="container">${esc(store.settings.footer_text||"© Minha Loja — Todos os direitos reservados.")}</div></div>`}
+function renderFooter() {
+  const f = document.querySelector('#footer');
+  if (!f) return;
+  const storeDesc = esc((store.settings && store.settings.store_description) || 'Tecnologia, novidades e produtos selecionados para você.');
+  const footerText = esc((store.settings && store.settings.footer_text) || '© MachadoExpress — Todos os direitos reservados.');
+
+  f.innerHTML = `
+    <div class="footer-art-wrapper" style="max-width:1166px;margin:25px auto 10px auto;padding:0 12px;position:relative;">
+      <div style="position:relative;width:100%;border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.5);line-height:0;">
+        <img src="/final.png?v=${Date.now()}" alt="MachadoExpress Informações e Benefícios" style="width:100%;height:auto;display:block;">
+        
+        <!-- 1. Compra Segura -->
+        <a href="politicas.html#seguranca" title="Compra Segura" style="position:absolute;top:2%;left:3%;width:45%;height:13%;display:block;cursor:pointer;z-index:10;"></a>
+        
+        <!-- 2. Entrega Rápida -->
+        <a href="politicas.html#entrega" title="Entrega Rápida" style="position:absolute;top:2%;left:52%;width:45%;height:13%;display:block;cursor:pointer;z-index:10;"></a>
+        
+        <!-- 3. Formas de Pagamento -->
+        <a href="#/produtos" title="Formas de Pagamento" style="position:absolute;top:17%;left:3%;width:45%;height:13%;display:block;cursor:pointer;z-index:10;"></a>
+        
+        <!-- 4. Suporte Especializado (WhatsApp) -->
+        <a href="https://wa.me/5551981884111?text=Ol%C3%A1%2C%20gostaria%20de%20atendimento%20na%20MachadoExpress" target="_blank" rel="noopener" title="Suporte WhatsApp" style="position:absolute;top:17%;left:52%;width:45%;height:13%;display:block;cursor:pointer;z-index:10;"></a>
+        
+        <!-- Política de Privacidade -->
+        <a href="politicas.html#privacidade" title="Política de Privacidade" style="position:absolute;bottom:3%;left:3%;width:28%;height:5%;display:block;cursor:pointer;z-index:10;"></a>
+        
+        <!-- Termos de Uso -->
+        <a href="politicas.html#termos" title="Termos de Uso" style="position:absolute;bottom:3%;left:35%;width:28%;height:5%;display:block;cursor:pointer;z-index:10;"></a>
+        
+        <!-- Atendimento / Suporte -->
+        <a href="https://wa.me/5551981884111?text=Ol%C3%A1%2C%20preciso%20de%20suporte" target="_blank" rel="noopener" title="Atendimento" style="position:absolute;bottom:3%;right:3%;width:28%;height:5%;display:block;cursor:pointer;z-index:10;"></a>
+      </div>
+    </div>
+    
+    <div class="container footer-inner" style="margin-top:20px;">
+      <div>
+        <div class="footer-brand">MACHADO<span>EXPRESS</span></div>
+        <p class="footer-copy">${storeDesc}</p>
+      </div>
+      <div class="footer-col">
+        <h4>Loja</h4>
+        <a href="#/">Início</a>
+        <a href="#/produtos">Produtos</a>
+        <a href="#/conta">Minha conta</a>
+      </div>
+      <div class="footer-col">
+        <h4>Ajuda</h4>
+        <a href="#/conta">Pedidos</a>
+        <a href="#/login">Entrar</a>
+        <a href="#/registro">Criar conta</a>
+      </div>
+      <div class="footer-col">
+        <h4>Segurança</h4>
+        <a href="politicas.html#seguranca">Compra protegida</a>
+        <a href="politicas.html#privacidade">Privacidade</a>
+        <a href="https://wa.me/5551981884111" target="_blank" rel="noopener">Atendimento</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container">${footerText}</div>
+    </div>`;
+}
 
 
 
