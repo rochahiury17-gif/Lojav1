@@ -409,7 +409,6 @@ function productCard(p){
   const tagEstoque = semEstoque ? `<label style="position:absolute;top:8px;right:8px;background:#ef4444;color:#fff;padding:4px 7px;border-radius:6px;font-size:9px;font-weight:900;">ESGOTADO</label>` : '';
   const textoEstoque = semEstoque ? 'Esgotado' : `Estoque: ${estoque} un.`;
   const corEstoque = semEstoque ? '#ef4444' : '#22c55e';
-  window.__currentProduct = p;
   return `<article class="product-card" style="display:flex;flex-direction:column;height:100%;background:#0c1322;border:1px solid rgba(255,255,255,0.08);border-radius:14px;overflow:hidden;">
     <div class="product-image" onclick="location.hash='#/produto/${p.id}'" style="cursor:pointer;position:relative;width:100%;aspect-ratio:1/1;background:#04070d;display:flex;align-items:center;justify-content:center;">
       ${imgHtml}
@@ -421,7 +420,7 @@ function productCard(p){
       <small style="display:block;margin-bottom:8px;color:${corEstoque};font-size:11px;font-weight:700;">${textoEstoque}</small>
       <div class="product-bottom" style="margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);">
         <strong style="color:#fff;font-size:15px;">${money(p.price)}</strong>
-        <button class="add-btn" ${semEstoque?'disabled aria-disabled="true"':''} onclick='addCart(${pJson},event)' style="background:linear-gradient(135deg,#06b6d4,#0284c7);color:#041019;border:none;border-radius:8px;padding:7px 12px;font-weight:800;font-size:11px;cursor:pointer;">${semEstoque?'Esgotado':'Adicionar +'}</button>
+        <button class="add-btn" ${semEstoque?'disabled aria-disabled="true"':''} onclick="addCartById(${p.id}, event)" style="background:linear-gradient(135deg,#06b6d4,#0284c7);color:#041019;border:none;border-radius:8px;padding:7px 12px;font-weight:800;font-size:11px;cursor:pointer;">${semEstoque?'Esgotado':'Adicionar +'}</button>
       </div>
     </div>
   </article>`;
@@ -2956,7 +2955,7 @@ window.productDetail = async function(id) {
 
   const estoque = Number(p.stock ?? 0);
   const semEstoque = estoque <= 0;
-  const pJson = JSON.stringify(p).replace(/'/g, "&#39;");
+  window.__currentProduct = p;
 
   $('#app').innerHTML = `
     <div class="container" style="max-width:960px;margin:20px auto;padding:12px;box-sizing:border-box;color:#fff;">
@@ -3042,4 +3041,14 @@ window.addCustomQtyCart = function() {
     addCart(p);
   }
   toast(`✓ ${qty}x ${p.name} adicionado ao carrinho!`);
+};
+
+window.addCartById = async function(id, ev) {
+  try {
+    const products = await api('/api/products');
+    const p = products.find(x => Number(x.id) === Number(id));
+    if (p) addCart(p, ev);
+  } catch(e) {
+    toast("Erro ao adicionar produto", "warn");
+  }
 };
