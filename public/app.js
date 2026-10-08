@@ -2646,3 +2646,127 @@ window.deleteAdminCategory = async function(catId, catName) {
     alert('Erro ao excluir categoria: ' + (err.message || err));
   }
 };
+
+
+// RENDERIZAÇÃO DA CONTA / PEDIDOS / PERFIL ORGANIZADO
+window.renderAccount = async function(subTab = 'pedidos') {
+  if (!store.user) { location.hash = '#/login'; return; }
+  
+  let orders = [];
+  try {
+    const res = await api('/api/orders');
+    orders = Array.isArray(res) ? res : (res.orders || []);
+  } catch(e) {
+    orders = [];
+  }
+
+  const activeTab = location.hash.includes('perfil') ? 'perfil' : (location.hash.includes('endereco') ? 'endereco' : 'pedidos');
+
+  const ordersHtml = orders.length === 0 ? `
+    <div style="text-align:center;padding:35px 20px;background:rgba(12,19,34,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:16px;color:#94a3b8;margin-top:14px;">
+      <span style="font-size:32px;display:block;margin-bottom:8px;">📦</span>
+      <h3 style="color:#fff;margin:0 0 6px;font-size:16px;">Nenhum pedido encontrado</h3>
+      <p style="font-size:13px;margin:0 0 16px;">Quando você fizer uma compra, poderá acompanhar todas as etapas por aqui.</p>
+      <a href="#/" style="display:inline-block;background:linear-gradient(135deg,#06b6d4,#0284c7);color:#041019;padding:10px 20px;border-radius:10px;font-weight:800;font-size:13px;text-decoration:none;box-shadow:0 0 12px rgba(6,182,212,0.4);">Explorar produtos</a>
+    </div>
+  ` : orders.map(o => `
+    <div style="background:linear-gradient(145deg,#0c1322 0%,#090e1a 100%);border:1px solid rgba(34,211,238,0.25);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 6px 20px rgba(0,0,0,0.5);">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:10px;margin-bottom:12px;">
+        <div>
+          <b style="color:#fff;font-size:15px;">Pedido #${esc(o.id)}</b>
+          <small style="display:block;color:#94a3b8;font-size:11px;">${esc((o.created_at || '').slice(0, 10))}</small>
+        </div>
+        <span style="padding:4px 10px;border-radius:999px;background:rgba(34,211,238,0.15);color:#38bdf8;font-size:11px;font-weight:700;">${esc(orderStatusLabel ? orderStatusLabel(o.status) : o.status)}</span>
+      </div>
+      
+      <div style="font-size:13px;color:#cbd5e1;margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span>Total dos itens:</span>
+          <strong style="color:#38bdf8;font-size:14px;">${typeof money === 'function' ? money(o.total) : ('R$ ' + o.total)}</strong>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;">
+        <button type="button" onclick="openOrderSupportModal(${Number(o.id)}, '${typeof money === 'function' ? money(o.total) : o.total}', '${o.status}')" style="flex:1;background:linear-gradient(135deg,rgba(34,211,238,0.2),rgba(6,182,212,0.1));border:1px solid #22d3ee;color:#38bdf8;font-weight:800;font-size:12px;padding:10px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+          <span>🎧</span> Suporte do Pedido
+        </button>
+      </div>
+    </div>
+  `).join('');
+
+  $('#app').innerHTML = `
+    <div style="max-width:650px;margin:20px auto;padding:16px;box-sizing:border-box;color:#fff;">
+      <div style="margin-bottom:20px;">
+        <h2 style="margin:0 0 4px;font-size:22px;color:#fff;">Olá, ${esc(store.user.name || 'Cliente')} 👋</h2>
+        <p style="margin:0;font-size:13px;color:#94a3b8;">Gerencie sua conta e acompanhe seus pedidos em tempo real.</p>
+      </div>
+
+      <!-- ABAS DE NAVEGAÇÃO DA CONTA -->
+      <div style="display:flex;gap:8px;margin-bottom:20px;background:rgba(12,19,34,0.8);padding:6px;border-radius:14px;border:1px solid rgba(255,255,255,0.08);">
+        <button onclick="location.hash='#/conta/pedidos'" style="flex:1;background:${activeTab==='pedidos'?'linear-gradient(135deg,#06b6d4,#0284c7)':'transparent'};color:${activeTab==='pedidos'?'#041019':'#cbd5e1'};border:none;padding:10px;border-radius:10px;font-weight:800;font-size:12px;cursor:pointer;">📦 Meus Pedidos</button>
+        <button onclick="location.hash='#/conta/perfil'" style="flex:1;background:${activeTab==='perfil'?'linear-gradient(135deg,#06b6d4,#0284c7)':'transparent'};color:${activeTab==='perfil'?'#041019':'#cbd5e1'};border:none;padding:10px;border-radius:10px;font-weight:800;font-size:12px;cursor:pointer;">👤 Perfil</button>
+        <button onclick="location.hash='#/conta/endereco'" style="flex:1;background:${activeTab==='endereco'?'linear-gradient(135deg,#06b6d4,#0284c7)':'transparent'};color:${activeTab==='endereco'?'#041019':'#cbd5e1'};border:none;padding:10px;border-radius:10px;font-weight:800;font-size:12px;cursor:pointer;">📍 Endereço</button>
+      </div>
+
+      <!-- CONTEÚDO DA ABA ATUAL -->
+      ${activeTab === 'pedidos' ? `
+        <div>
+          <h3 style="font-size:16px;color:#fff;margin:0 0 12px;">Acompanhamento de Pedidos</h3>
+          ${ordersHtml}
+        </div>
+      ` : activeTab === 'perfil' ? `
+        <div style="background:linear-gradient(145deg,#0c1322 0%,#090e1a 100%);border:1px solid rgba(34,211,238,0.3);border-radius:18px;padding:20px;">
+          <h3 style="font-size:16px;color:#fff;margin:0 0 14px;">Suas Informações Pessoais</h3>
+          <form onsubmit="updateProfileData(event)" style="display:flex;flex-direction:column;gap:12px;">
+            <div>
+              <label style="display:block;font-size:11px;color:#38bdf8;font-weight:700;margin-bottom:4px;text-transform:uppercase;">Nome Completo</label>
+              <input id="prof-name" value="${esc(store.user.name || '')}" style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 12px;color:#fff;font-size:13px;outline:none;" required>
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;color:#38bdf8;font-weight:700;margin-bottom:4px;text-transform:uppercase;">E-mail</label>
+              <input value="${esc(store.user.email || '')}" style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 12px;color:#94a3b8;font-size:13px;outline:none;" disabled>
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;color:#38bdf8;font-weight:700;margin-bottom:4px;text-transform:uppercase;">Telefone / WhatsApp</label>
+              <input id="prof-phone" value="${esc(store.user.phone || '')}" placeholder="(00) 00000-0000" style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 12px;color:#fff;font-size:13px;outline:none;">
+            </div>
+            <button type="submit" style="background:linear-gradient(135deg,#06b6d4,#0284c7);color:#041019;border:none;padding:12px;border-radius:10px;font-weight:800;font-size:13px;cursor:pointer;margin-top:6px;">Salvar Perfil</button>
+          </form>
+        </div>
+      ` : `
+        <div style="background:linear-gradient(145deg,#0c1322 0%,#090e1a 100%);border:1px solid rgba(34,211,238,0.3);border-radius:18px;padding:20px;">
+          <h3 style="font-size:16px;color:#fff;margin:0 0 14px;">Endereço de Entrega</h3>
+          <form onsubmit="saveUserAddress(event)" style="display:flex;flex-direction:column;gap:12px;">
+            <div>
+              <label style="display:block;font-size:11px;color:#38bdf8;font-weight:700;margin-bottom:4px;text-transform:uppercase;">CEP</label>
+              <input id="adr-cep" value="${esc(store.user.address?.cep || '')}" placeholder="00000-000" style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 12px;color:#fff;font-size:13px;outline:none;">
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;color:#38bdf8;font-weight:700;margin-bottom:4px;text-transform:uppercase;">Rua / Endereço</label>
+              <input id="adr-street" value="${esc(store.user.address?.street || '')}" placeholder="Ex: Rua Principal" style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 12px;color:#fff;font-size:13px;outline:none;" required>
+            </div>
+            <div style="display:flex;gap:10px;">
+              <div style="flex:1;">
+                <label style="display:block;font-size:11px;color:#38bdf8;font-weight:700;margin-bottom:4px;text-transform:uppercase;">Número</label>
+                <input id="adr-number" value="${esc(store.user.address?.number || '')}" placeholder="123" style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 12px;color:#fff;font-size:13px;outline:none;" required>
+              </div>
+              <div style="flex:2;">
+                <label style="display:block;font-size:11px;color:#38bdf8;font-weight:700;margin-bottom:4px;text-transform:uppercase;">Bairro</label>
+                <input id="adr-neighborhood" value="${esc(store.user.address?.neighborhood || '')}" placeholder="Bairro" style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 12px;color:#fff;font-size:13px;outline:none;" required>
+              </div>
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;color:#38bdf8;font-weight:700;margin-bottom:4px;text-transform:uppercase;">Cidade - UF</label>
+              <input id="adr-city" value="${esc(store.user.address?.city || '')}" placeholder="Porto Alegre - RS" style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 12px;color:#fff;font-size:13px;outline:none;" required>
+            </div>
+            <button type="submit" style="background:linear-gradient(135deg,#06b6d4,#0284c7);color:#041019;border:none;padding:12px;border-radius:10px;font-weight:800;font-size:13px;cursor:pointer;margin-top:6px;">Salvar Endereço</button>
+          </form>
+        </div>
+      `}
+
+      <div style="text-align:center;margin-top:24px;">
+        <button onclick="logout()" style="background:rgba(239,68,68,0.15);border:1px solid #ef4444;color:#f87171;padding:10px 20px;border-radius:10px;font-weight:700;font-size:12px;cursor:pointer;">Sair da conta</button>
+      </div>
+    </div>
+  `;
+};
