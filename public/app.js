@@ -802,7 +802,7 @@ function adminDenied(){toast("Essa área é exclusiva para equipe autorizada.","
 async function requireAdmin(full=false){if(!store.user||!ADMIN_ROLES.includes(store.user.role)){adminDenied();return false}if(full&&!FULL_ADMIN.includes(store.user.role)){toast("Permissão de administrador necessária.","warn");return false}return true}
 function adminShell(title,body){$("#app").innerHTML=`<section class="admin-page container"><div class="admin-top"><div><span>CONTROL CENTER</span><h1>${title}</h1></div><a class="btn ghost" href="#/">← Voltar à loja</a></div><div class="admin-layout"><aside class="admin-sidebar"><div class="admin-brand">MINHA<span>LOJA</span><small>ADMIN CONSOLE</small></div><div class="admin-user"><b>${esc(store.user.name)}</b><small>${esc(store.user.role)}</small></div><a href="#/admin">◈ Dashboard</a><a href="#/admin/produtos">▣ Produtos</a><a href="#/admin/pedidos">⌁ Pedidos</a>
         <a href="#/admin/suporte" style="background:rgba(34,211,238,0.15);color:#38bdf8;font-weight:bold;">💬 Atendimento / Chat</a><a href="#/admin/clientes">◎ Clientes</a><a href="#/admin/equipe">◇ Equipe</a><a href="#/admin/posts">▤ Gerar posts</a><a href="#/admin/config">⚙ Configurações</a><button onclick="logout()">↪ Sair</button></aside><div class="admin-main">${body}</div></div></section>`}
-async function admin(){if(!await requireAdmin())return;let s=await api("/api/admin/stats");adminShell("Dashboard",`<div class="stats-grid"><div><span>Faturamento pago</span><b>${money(s.revenue)}</b><small>total recebido</small></div><div><span>Pedidos</span><b>${s.orders}</b><small>todos os pedidos</small></div><div><span>Clientes</span><b>${s.customers}</b><small>contas de clientes</small></div><div><span>Produtos</span><b>${s.products}</b><small>catálogo total</small></div></div><div class="admin-welcome"><div><span>PAINEL DE CONTROLE</span><h2>Olá, ${esc(store.user.name.split(" ")[0])}.</h2><p>Tenha uma visão rápida da operação da sua loja.</p></div><div class="pulse">● SISTEMA ONLINE</div></div><div class="admin-shortcuts"><a href="#/admin/produtos"><b>▣</b><span>Produtos<small>Gerenciar catálogo</small></span>→</a><a href="#/admin/pedidos"><b>⌁</b><span>Pedidos<small>Acompanhar vendas</small></span>→</a><a href="#/admin/clientes"><b>◎</b><span>Clientes<small>Base de clientes</small></span>→</a><a href="#/admin/config"><b>⚙</b><span>Configurações<small>Personalizar loja</small></span>→</a></div>`)}
+async function admin(){if(!await requireAdmin())return;let s=await api("/api/admin/stats");adminShell("Dashboard",`<div class="stats-grid"><div><span>Faturamento pago</span><b>${money(s.revenue)}</b><small>total recebido</small></div><div><span>Pedidos</span><b>${s.orders}</b><small>todos os pedidos</small></div><div><span>Clientes</span><b>${s.customers}</b><small>contas de clientes</small></div><div><span>Produtos</span><b>${s.products}</b><small>catálogo total</small></div></div><div style="margin-top:18px;border:1px solid #dbeafe;background:linear-gradient(135deg,#eff6ff,#fff);border-radius:16px;padding:18px;display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap"><div><div style="font-size:12px;font-weight:900;color:#2563eb;letter-spacing:.04em">ATENDIMENTO AO CLIENTE</div><h3 style="margin:5px 0 4px;color:#111827">🎧 Central de Suporte</h3><p style="margin:0;color:#6b7280">Pedidos e atendimentos gerais em um único chat.</p></div><a href="#/admin/suporte" style="display:inline-flex;align-items:center;gap:7px;background:#2563eb;color:#fff;text-decoration:none;border-radius:10px;padding:11px 15px;font-weight:800">Abrir suporte →</a></div><div class="admin-welcome"><div><span>PAINEL DE CONTROLE</span><h2>Olá, ${esc(store.user.name.split(" ")[0])}.</h2><p>Tenha uma visão rápida da operação da sua loja.</p></div><div class="pulse">● SISTEMA ONLINE</div></div><div class="admin-shortcuts"><a href="#/admin/produtos"><b>▣</b><span>Produtos<small>Gerenciar catálogo</small></span>→</a><a href="#/admin/pedidos"><b>⌁</b><span>Pedidos<small>Acompanhar vendas</small></span>→</a><a href="#/admin/clientes"><b>◎</b><span>Clientes<small>Base de clientes</small></span>→</a><a href="#/admin/config"><b>⚙</b><span>Configurações<small>Personalizar loja</small></span>→</a></div>`)}
 
 let selectedProds = new Set();
 
@@ -2254,50 +2254,30 @@ window.quickView = function(p) {
 
         messagesEl.innerHTML = messages.length
           ? messages.map(m => {
-              const customer =
-                String(m.sender_role || "").toLowerCase() === "customer";
+              const senderRole = String(m.sender_role || "").toLowerCase();
+              const customer = senderRole === "customer";
+              const rawSender = String(m.sender_name || "Equipe");
+              const isOwner = !customer && /dono|propriet[aá]rio|hiury/i.test(rawSender);
+              const senderName = rawSender
+                .replace(/[👑⭐🏆]/gu, "")
+                .replace(/\bDONO\b/gi, "")
+                .replace(/^\s*(?:🛠️?\s*)?Atendimento\s*[·•—-]?\s*/i, "")
+                .replace(/^\s*(?:Equipe|Time)\s+(?:Machado\s+Express)\s*[·•—-]?\s*/i, "")
+                .replace(/\s*[·•—-]\s*/g, " ")
+                .replace(/\s+/g, " ").trim() || "Equipe Machado Express";
+              const senderLabel = customer
+                ? "VOCÊ"
+                : isOwner ? "PROPRIETÁRIO DA LOJA" : "EQUIPE MACHADO EXPRESS";
+              const displayName = customer ? "Você" : senderName;
+              const bubbleBg = customer ? "#111827" : isOwner ? "linear-gradient(145deg,#fffdf5,#fff7df)" : "#fff";
+              const bubbleBorder = customer ? "#111827" : isOwner ? "#d4a72c" : "#e5e7eb";
 
               return `
-                <div style="
-                  display:flex;
-                  justify-content:${customer ? "flex-end" : "flex-start"};
-                  margin-bottom:12px;
-                ">
-                  <div style="
-                    max-width:82%;
-                    padding:10px 12px;
-                    border-radius:14px;
-                    background:${customer ? "#111827" : "#fff"};
-                    color:${customer ? "#fff" : "#111827"};
-                    border:1px solid ${customer ? "#111827" : "#e5e7eb"};
-                  ">
-                    <div style="
-                      font-size:11px;
-                      font-weight:900;
-                      margin-bottom:5px;
-                      opacity:.75;
-                    ">
-                      ${customer
-                        ? "👤 Você"
-                        : `🛠️ Atendimento · ${esc(m.sender_name || "Equipe")}`
-                      }
-                    </div>
-
-                    <div style="
-                      font-size:14px;
-                      line-height:1.5;
-                      white-space:pre-wrap;
-                    ">
-                      ${esc(m.message || "")}
-                    </div>
-
-                    <div style="
-                      margin-top:5px;
-                      font-size:10px;
-                      opacity:.6;
-                    ">
-                      ${esc(formatTime(m.created_at))}
-                    </div>
+                <div style="display:flex;justify-content:${customer ? "flex-end" : "flex-start"};margin-bottom:14px;">
+                  <div style="max-width:88%;padding:13px 14px;border-radius:${customer ? "18px 18px 5px 18px" : "5px 18px 18px 18px"};background:${bubbleBg};color:${customer ? "#fff" : "#111827"};border:1px solid ${bubbleBorder};box-shadow:${isOwner ? "0 5px 18px rgba(180,133,24,.13)" : "0 2px 8px rgba(15,23,42,.04)"};">
+                    ${isOwner ? `<div style="display:flex;align-items:center;gap:7px;margin-bottom:9px;padding-bottom:9px;border-bottom:1px solid rgba(180,133,24,.22);"><span style="display:inline-flex;align-items:center;justify-content:center;width:29px;height:29px;border-radius:50%;background:linear-gradient(135deg,#f8df8b,#c18b18);font-size:16px;box-shadow:0 2px 7px rgba(180,133,24,.22);">👑</span><div><div style="font-size:13px;font-weight:900;line-height:1.2;color:#6f4c00;">${esc(displayName)}</div><div style="font-size:9px;letter-spacing:.7px;font-weight:900;color:#9a7118;margin-top:3px;">PROPRIETÁRIO DA MACHADO EXPRESS</div></div><span style="margin-left:auto;font-size:9px;font-weight:900;color:#805b0a;background:#f8e7b0;border:1px solid #e7cb76;border-radius:20px;padding:4px 7px;white-space:nowrap;">DONO</span></div>` : `<div style="font-size:10px;letter-spacing:.5px;font-weight:900;margin-bottom:7px;color:${customer ? "#a5dfff" : "#64748b"};">${customer ? "👤 VOCÊ" : `🛠️ ${esc(displayName)}`}</div>`}
+                    <div style="font-size:14px;line-height:1.55;white-space:pre-wrap;">${esc(m.message || "")}</div>
+                    <div style="margin-top:8px;font-size:10px;text-align:right;color:${customer ? "#cbd5e1" : isOwner ? "#9a7b36" : "#94a3b8"};">${esc(new Date(m.created_at).toLocaleString("pt-BR", {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"}))}</div>
                   </div>
                 </div>
               `;
@@ -2320,6 +2300,13 @@ window.quickView = function(p) {
 
         const actions =
           document.getElementById("machadoGeneralActions");
+
+        const supportForm = document.getElementById("machadoGeneralForm");
+        const supportInput = document.getElementById("machadoGeneralInput");
+        const finalized = chat.status === "finalizado";
+
+        if (supportForm) supportForm.style.display = finalized ? "none" : "flex";
+        if (supportInput) supportInput.disabled = finalized;
 
         if (chat.status === "finalizado") {
           actions.innerHTML = `
@@ -2356,9 +2343,14 @@ window.quickView = function(p) {
           actions.innerHTML = "";
         }
       } catch (e) {
+        console.error("[SUPORTE GERAL] carregar conversa:", e);
+
         messagesEl.innerHTML = `
           <div style="padding:30px;text-align:center;color:#b91c1c;">
-            Não foi possível carregar esta conversa.
+            <strong>Não foi possível carregar esta conversa.</strong>
+            <div style="margin-top:8px;font-size:12px;color:#7f1d1d;">
+              ${esc(e?.message || "Erro desconhecido.")}
+            </div>
           </div>
         `;
       }
@@ -3660,7 +3652,7 @@ window.supportAdminAction = async function(action, orderId) {
     let method = "POST";
 
     if (chat._kind === "general") {
-      if (name === "assume")
+      if (name === "assume" || name === "start")
         url = `/api/admin/support/general-chats/${chat._id}/assume`;
       if (name === "finalize")
         url = `/api/admin/support/general-chats/${chat._id}/finalize`;
@@ -3859,12 +3851,37 @@ window.supportAdminAction = async function(action, orderId) {
             `).join("")}
           </div>
 
-          <div style="
-            display:grid;
-            grid-template-columns:minmax(280px,390px) minmax(0,1fr);
-            gap:14px;
-            min-height:620px;
-          ">
+          <style>
+            #machadoAdminSupportLayout {
+              display:grid;
+              grid-template-columns:minmax(280px,390px) minmax(0,1fr);
+              gap:14px;
+              min-height:620px;
+            }
+
+            #machadoAdminSupportLayout > * {
+              min-width:0;
+            }
+
+            @media (max-width:760px) {
+              #machadoAdminSupportLayout {
+                grid-template-columns:minmax(0,1fr);
+                min-height:0;
+              }
+
+              #machadoAdminSupportLayout > aside {
+                max-height:46vh;
+                overflow:auto;
+              }
+
+              #machadoAdminSupportLayout > main {
+                min-height:520px;
+                width:100%;
+              }
+            }
+          </style>
+
+          <div id="machadoAdminSupportLayout">
             <aside style="
               border:1px solid #e5e7eb;
               border-radius:14px;
@@ -4009,7 +4026,7 @@ window.supportAdminAction = async function(action, orderId) {
                                 cursor:pointer;
                                 font-weight:800;
                               ">
-                              👋 Assumir
+                              ${active.status === "novo" ? "▶️ Iniciar atendimento" : "👋 Assumir atendimento"}
                             </button>
 
                             <button data-action="finalize"
@@ -4135,13 +4152,15 @@ window.supportAdminAction = async function(action, orderId) {
 
       root.querySelectorAll("[data-chat-kind]").forEach(btn => {
         btn.onclick = async () => {
+          const kind = btn.dataset.chatKind;
+          const id = btn.dataset.chatId;
+
           active = chats.find(c =>
-            c._kind === btn.dataset.chatKind &&
-            String(c._id) === String(btn.dataset.chatId)
+            c._kind === kind &&
+            String(c._id) === String(id)
           ) || null;
 
           await render();
-          await loadActiveMessages();
         };
       });
 
@@ -4152,9 +4171,47 @@ window.supportAdminAction = async function(action, orderId) {
 
       root.querySelectorAll("[data-action]").forEach(btn => {
         btn.onclick = async () => {
-          await action(active, btn.dataset.action);
-          await render();
-          if (active) await loadActiveMessages();
+          try {
+            btn.disabled = true;
+
+            const currentKind = active?._kind;
+            const currentId = active?._id;
+            const actionName = btn.dataset.action;
+
+            await action(active, actionName);
+
+            // Atualiza a aba de destino conforme a ação confirmada.
+            if (actionName === "finalize") {
+              activeTab = "finalizados";
+              active = null;
+            } else if (
+              actionName === "assume" ||
+              actionName === "start" ||
+              actionName === "reopen"
+            ) {
+              activeTab = "andamento";
+            }
+
+            chats = await loadLists();
+
+            if (actionName !== "finalize") {
+              active = chats.find(c =>
+                c._kind === currentKind &&
+                Number(c._id) === Number(currentId)
+              ) || null;
+            }
+
+            await render();
+
+          } catch (e) {
+            console.error("[ADMIN SUPORTE] ação:", e);
+            alert(
+              "Não foi possível atualizar o atendimento: " +
+              (e?.message || e)
+            );
+          } finally {
+            btn.disabled = false;
+          }
         };
       });
 
@@ -4173,8 +4230,18 @@ window.supportAdminAction = async function(action, orderId) {
           try {
             await send(active, value);
             input.value = "";
+
+            const kind = active?._kind;
+            const id = active?._id;
+
+            chats = await loadLists();
+
+            active = chats.find(c =>
+              c._kind === kind &&
+              Number(c._id) === Number(id)
+            ) || null;
+
             await render();
-            await loadActiveMessages();
           } finally {
             input.disabled = false;
             input.focus();
@@ -4208,310 +4275,38 @@ window.supportAdminAction = async function(action, orderId) {
 
     clearInterval(poll);
     poll = setInterval(async () => {
-      try {
-        const fresh = await loadLists();
+      if (!active) return;
 
-        if (!active) {
-          chats = fresh;
+      const currentKind = active._kind;
+      const currentId = Number(active._id);
+
+      try {
+        const list = await messages(active);
+
+        // O usuário pode ter trocado de chat enquanto a requisição estava em andamento.
+        // Nesse caso, não mexe no chat que está atualmente aberto.
+        if (
+          !active ||
+          active._kind !== currentKind ||
+          Number(active._id) !== currentId
+        ) {
           return;
         }
 
-        const current = fresh.find(x =>
-          x._kind===active._kind &&
-          x._id===active._id
-        );
+        const box = document.querySelector("#machadoAdminMessages");
+        if (!box) return;
 
-        if (current) {
-          active = current;
-          chats = fresh;
-          await loadActiveMessages();
-        }
-      } catch {}
+        box.innerHTML = renderMessages(list);
+        box.scrollTop = box.scrollHeight;
+      } catch (e) {
+        // Falha momentânea de polling não deve apagar o chat nem trocar a tela.
+        console.warn("[ADMIN SUPORTE] polling:", e);
+      }
     }, 5000);
   };
 
   window.adminSupport = window.machadoAdminSupport;
 })();
-
-
-window.adminSupport = async function() {
-  if (!store.user || !["super_admin","admin","gerente","atendente"].includes(store.user.role)) {
-    location.hash = "#/login";
-    return;
-  }
-
-  let chats = [];
-
-  try {
-    const res = await api("/api/admin/support/chats");
-    chats = Array.isArray(res) ? res : [];
-  } catch (e) {
-    console.error("[SUPORTE ADMIN]", e);
-    chats = [];
-  }
-
-  window.__adminChatsCache = chats;
-
-  const renderChatList = (filterTerm = "", statusFilter = "todos") => {
-    let list = window.__adminChatsCache || [];
-
-    if (filterTerm) {
-      const term = filterTerm.toLowerCase();
-
-      list = list.filter(c =>
-        String(c.id).includes(term) ||
-        String(c.customer_name || "").toLowerCase().includes(term) ||
-        String(c.customer_phone || "").includes(term)
-      );
-    }
-
-    if (statusFilter !== "todos") {
-      list = list.filter(c => (c.support_status || "novo") === statusFilter);
-    }
-
-    if (!list.length) {
-      return `
-        <div style="text-align:center;padding:40px 20px;background:#0c1322;border:1px solid rgba(255,255,255,.08);border-radius:16px;color:#94a3b8;">
-          <span style="font-size:32px;display:block;margin-bottom:8px;">💬</span>
-          <h3 style="color:#fff;margin:0 0 6px;">Nenhum atendimento encontrado</h3>
-          <p style="font-size:13px;margin:0;">Os atendimentos aparecerão aqui quando houver mensagens.</p>
-        </div>
-      `;
-    }
-
-    return list.map(c => {
-      const supportStatus = c.support_status || "novo";
-      const info = window.supportStatusInfo(supportStatus);
-
-      const unread = Number(c.unread_admin || 0);
-
-      const waClean = (c.customer_phone || "").replace(/\D/g, "");
-      const waLink = waClean
-        ? `https://wa.me/${waClean.startsWith("55") ? waClean : "55" + waClean}?text=${encodeURIComponent(
-            "Olá " + (c.customer_name || "Cliente") +
-            "! Falamos do suporte da MachadoExpress sobre seu Pedido #" + c.id
-          )}`
-        : "";
-
-      let actionButton = "";
-
-      if (supportStatus === "novo") {
-        actionButton = `
-          <button
-            type="button"
-            onclick="supportAdminAction('assume', ${Number(c.id)})"
-            style="background:rgba(59,130,246,.15);border:1px solid #3b82f6;color:#60a5fa;padding:9px 12px;border-radius:9px;font-weight:800;cursor:pointer;">
-            👋 Assumir
-          </button>
-        `;
-      } else if (supportStatus === "andamento" || supportStatus === "aguardando_cliente") {
-        actionButton = `
-          <button
-            type="button"
-            onclick="supportAdminAction('finalize', ${Number(c.id)})"
-            style="background:rgba(34,197,94,.12);border:1px solid #22c55e;color:#4ade80;padding:9px 12px;border-radius:9px;font-weight:800;cursor:pointer;">
-            ✅ Finalizar
-          </button>
-        `;
-      } else if (supportStatus === "finalizado") {
-        actionButton = `
-          <button
-            type="button"
-            onclick="supportAdminAction('reopen', ${Number(c.id)})"
-            style="background:rgba(234,179,8,.12);border:1px solid #eab308;color:#facc15;padding:9px 12px;border-radius:9px;font-weight:800;cursor:pointer;">
-            🔓 Reabrir
-          </button>
-        `;
-      }
-
-      return `
-        <article style="background:linear-gradient(145deg,#0c1322 0%,#090e1a 100%);border:1px solid rgba(56,189,248,.25);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 4px 15px rgba(0,0,0,.4);">
-
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
-            <div>
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                <b style="color:#fff;font-size:16px;">Pedido #${esc(c.id)}</b>
-
-                <span style="font-size:11px;padding:3px 9px;border-radius:999px;background:${info.bg};color:${info.color};font-weight:800;">
-                  ${info.icon} ${esc(info.label)}
-                </span>
-
-                ${unread > 0 ? `
-                  <span style="font-size:10px;padding:3px 8px;border-radius:999px;background:#ef4444;color:#fff;font-weight:900;">
-                    ${unread} nova${unread > 1 ? "s" : ""}
-                  </span>
-                ` : ""}
-              </div>
-
-              <div style="margin-top:7px;font-size:13px;color:#cbd5e1;">
-                <strong>👤 ${esc(c.customer_name || "Cliente")}</strong>
-                ·
-                <span>📱 ${esc(c.customer_phone || "Sem telefone")}</span>
-              </div>
-            </div>
-
-            <div style="text-align:right;">
-              <strong style="color:#38bdf8;font-size:16px;">
-                ${typeof money === "function" ? money(c.total) : ("R$ " + c.total)}
-              </strong>
-
-              <small style="display:block;color:#94a3b8;font-size:11px;">
-                ${esc(c.message_count || 0)} mensagens
-              </small>
-            </div>
-          </div>
-
-          <div style="margin:12px 0;padding:10px 12px;background:rgba(15,23,42,.6);border-radius:10px;border:1px solid rgba(255,255,255,.06);font-size:13px;color:#94a3b8;">
-            <span style="color:#38bdf8;font-weight:bold;">Última mensagem:</span>
-            ${esc(c.last_message || "Nenhuma mensagem")}
-          </div>
-
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-
-            <button
-              type="button"
-              onclick="openOrderChatModal(${Number(c.id)})"
-              style="flex:1;min-width:145px;background:linear-gradient(135deg,#06b6d4,#0284c7);color:#fff;border:none;padding:10px 14px;border-radius:10px;font-weight:800;font-size:13px;cursor:pointer;">
-              💬 Abrir Chat
-            </button>
-
-            ${actionButton}
-
-            ${waLink ? `
-              <a
-                href="${waLink}"
-                target="_blank"
-                rel="noopener noreferrer"
-                style="background:rgba(37,211,102,.12);border:1px solid #25d366;color:#4ade80;padding:10px 14px;border-radius:10px;font-weight:700;font-size:13px;text-decoration:none;display:flex;align-items:center;gap:6px;">
-                📲 WhatsApp
-              </a>
-            ` : ""}
-          </div>
-        </article>
-      `;
-    }).join("");
-  };
-
-  window.renderChatList = renderChatList;
-
-  const countStatus = status =>
-    chats.filter(c => (c.support_status || "novo") === status).length;
-
-  const unreadTotal = chats.reduce(
-    (sum, c) => sum + Number(c.unread_admin || 0),
-    0
-  );
-
-  $("#app").innerHTML = `
-    <div class="admin-shell">
-
-      <aside class="admin-side">
-        <div class="admin-user-box">
-          <b>${esc(store.user.name)}</b>
-          <small>${esc(store.user.role)}</small>
-        </div>
-
-        <a href="#/admin">◈ Dashboard</a>
-        <a href="#/admin/produtos">▣ Produtos</a>
-        <a href="#/admin/pedidos">⌁ Pedidos</a>
-        <a href="#/admin/clientes">◎ Clientes</a>
-
-        <a href="#/admin/suporte" style="background:rgba(34,211,238,.15);color:#38bdf8;font-weight:bold;">
-          💬 Atendimento / Chat
-        </a>
-
-        <a href="#/admin/equipe">◇ Equipe</a>
-        <a href="#/admin/posts">▤ Gerar posts</a>
-        <a href="#/admin/config">⚙ Configurações</a>
-
-        <button onclick="logout()">↪ Sair</button>
-      </aside>
-
-      <main class="admin-main">
-
-        <div class="panel-head" style="margin-bottom:16px;">
-          <div>
-            <span style="color:#38bdf8;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;">
-              CENTRAL DE ATENDIMENTO
-            </span>
-
-            <h2 style="font-size:22px;color:#fff;margin:2px 0 0;">
-              Chat dos Pedidos
-            </h2>
-          </div>
-
-          <div style="font-size:12px;color:#94a3b8;">
-            ${unreadTotal > 0 ? `🔴 ${unreadTotal} mensagem(ns) nova(s)` : "✓ Tudo lido"}
-          </div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:14px;">
-          ${[
-            ["novo","🆕","Novos"],
-            ["andamento","🔵","Em andamento"],
-            ["aguardando_cliente","🟡","Aguardando"],
-            ["finalizado","🟢","Finalizados"]
-          ].map(([key,icon,label]) => `
-            <div style="background:#0c1322;border:1px solid rgba(255,255,255,.08);border-radius:11px;padding:10px;">
-              <div style="font-size:11px;color:#94a3b8;">${icon} ${label}</div>
-              <strong style="display:block;color:#fff;font-size:18px;margin-top:3px;">
-                ${countStatus(key)}
-              </strong>
-            </div>
-          `).join("")}
-        </div>
-
-        <div style="background:#0c1322;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;margin-bottom:16px;">
-
-          <input
-            id="adminChatSearch"
-            placeholder="🔍 Buscar por Nº do pedido, nome do cliente ou telefone..."
-            style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 14px;color:#fff;font-size:13px;outline:none;"
-            oninput="document.getElementById('adminChatListContainer').innerHTML = renderChatList(this.value, document.querySelector('.chat-filter-btn.active')?.dataset.status || 'todos')"
-          >
-
-          <div style="display:flex;gap:8px;margin-top:10px;overflow-x:auto;">
-
-            <button type="button" class="chat-filter-btn active" data-status="todos"
-              onclick="document.querySelectorAll('.chat-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('adminChatListContainer').innerHTML=renderChatList(document.getElementById('adminChatSearch').value,'todos')"
-              style="background:#0284c7;color:#fff;border:none;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">
-              Todos
-            </button>
-
-            <button type="button" class="chat-filter-btn" data-status="novo"
-              onclick="document.querySelectorAll('.chat-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('adminChatListContainer').innerHTML=renderChatList(document.getElementById('adminChatSearch').value,'novo')"
-              style="background:rgba(255,255,255,.06);color:#cbd5e1;border:1px solid rgba(255,255,255,.1);padding:7px 12px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">
-              🆕 Novos
-            </button>
-
-            <button type="button" class="chat-filter-btn" data-status="andamento"
-              onclick="document.querySelectorAll('.chat-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('adminChatListContainer').innerHTML=renderChatList(document.getElementById('adminChatSearch').value,'andamento')"
-              style="background:rgba(255,255,255,.06);color:#cbd5e1;border:1px solid rgba(255,255,255,.1);padding:7px 12px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">
-              🔵 Andamento
-            </button>
-
-            <button type="button" class="chat-filter-btn" data-status="aguardando_cliente"
-              onclick="document.querySelectorAll('.chat-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('adminChatListContainer').innerHTML=renderChatList(document.getElementById('adminChatSearch').value,'aguardando_cliente')"
-              style="background:rgba(255,255,255,.06);color:#cbd5e1;border:1px solid rgba(255,255,255,.1);padding:7px 12px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">
-              🟡 Aguardando
-            </button>
-
-            <button type="button" class="chat-filter-btn" data-status="finalizado"
-              onclick="document.querySelectorAll('.chat-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('adminChatListContainer').innerHTML=renderChatList(document.getElementById('adminChatSearch').value,'finalizado')"
-              style="background:rgba(255,255,255,.06);color:#cbd5e1;border:1px solid rgba(255,255,255,.1);padding:7px 12px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">
-              🟢 Finalizados
-            </button>
-          </div>
-        </div>
-
-        <div id="adminChatListContainer">
-          ${renderChatList()}
-        </div>
-
-      </main>
-    </div>
-  `;
-};
 
 
 window.productDetail = async function(id) {
@@ -5019,43 +4814,34 @@ if (!window.__chatPollInterval) {
     }
   };
 
-  const showSupportToast = (title, message, orderId) => {
+  const showSupportToast = (title, message, chatId, chatKind = "order", isAdmin = false) => {
     const old = document.querySelector(".machado-support-toast");
     if (old) old.remove();
 
     const toast = document.createElement("div");
     toast.className = "machado-support-toast";
-
+    const safeId = Number(chatId) || 0;
     toast.innerHTML = `
-      <div class="machado-support-toast-title">
-        💬 ${esc(title)}
-      </div>
-      <div class="machado-support-toast-text">
-        ${esc(message)}
-      </div>
-      ${
-        orderId
-          ? `<button type="button" data-open-support="${Number(orderId)}">
-               Abrir atendimento
-             </button>`
-          : ""
-      }
+      <div class="machado-support-toast-title">💬 ${esc(title)}</div>
+      <div class="machado-support-toast-text">${esc(message)}</div>
+      ${safeId ? `<button type="button" data-open-support="${safeId}" data-support-kind="${chatKind}">Abrir atendimento</button>` : ""}
     `;
-
     document.body.appendChild(toast);
 
     const btn = toast.querySelector("[data-open-support]");
-    if (btn) {
-      btn.addEventListener("click", () => {
-        const id = Number(btn.dataset.openSupport);
-        toast.remove();
+    if (btn) btn.addEventListener("click", () => {
+      const id = Number(btn.dataset.openSupport);
+      const kind = btn.dataset.supportKind;
+      toast.remove();
+      if (kind === "general") {
+        // A central de suporte geral é a mesma lista usada pelo cliente e pelo ADM.
+        location.hash = isAdmin ? "#/admin/suporte" : "#/suporte";
+      } else if (id && typeof window.openOrderChatModal === "function") {
         window.openOrderChatModal(id);
-      });
-    }
+      }
+    });
 
-    setTimeout(() => {
-      if (toast.isConnected) toast.remove();
-    }, 9000);
+    setTimeout(() => { if (toast.isConnected) toast.remove(); }, 9000);
   };
 
   // ============================================================
@@ -5064,7 +4850,7 @@ if (!window.__chatPollInterval) {
   function updateSupportBadges(total) {
     document
       .querySelectorAll(
-        'a[href="#/admin/suporte"],a[href="#/conta/suporte"]'
+        'a[href="#/admin/suporte"],a[href="#/conta/suporte"],a[href="#/suporte"]'
       )
       .forEach((link) => {
         let badge = link.querySelector(".machado-support-badge");
@@ -5095,153 +4881,94 @@ if (!window.__chatPollInterval) {
 
   async function getSupportChatsForNotification() {
     try {
-      const sessionRes = await fetch("/api/auth/session", {
-        credentials: "same-origin"
-      });
-
+      const sessionRes = await fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store" });
       if (!sessionRes.ok) return null;
-
       const session = await sessionRes.json();
-
       if (!session.authenticated || !session.user) {
         updateSupportBadges(0);
+        supportNotificationReady = false;
+        lastUnreadSupport = null;
         return null;
       }
 
-      const rolesAdmin = [
-        "admin",
-        "super_admin",
-        "owner"
-      ];
+      const role = String(session.user.role || "").toLowerCase();
+      const isAdmin = ["admin", "super_admin", "owner", "gerente", "atendente"].includes(role);
+      const endpoints = isAdmin
+        ? [
+            { url: "/api/admin/support/chats", kind: "order" },
+            { url: "/api/admin/support/general-chats", kind: "general" }
+          ]
+        : [
+            { url: "/api/me/support/chats", kind: "order" },
+            { url: "/api/me/support/general-chats", kind: "general" }
+          ];
 
-      const isAdmin = rolesAdmin.includes(
-        String(session.user.role || "").toLowerCase()
-      );
-
-      const endpoint = isAdmin
-        ? "/api/admin/support/chats"
-        : "/api/me/support/chats";
-
-      const res = await fetch(endpoint, {
-        credentials: "same-origin",
-        cache: "no-store"
-      });
-
-      if (!res.ok) return null;
-
-      const chats = await res.json();
-
-      if (!Array.isArray(chats)) return null;
-
-      return { chats, isAdmin };
-    } catch {
-      return null;
-    }
+      const responses = await Promise.all(endpoints.map(async item => {
+        try {
+          const res = await fetch(item.url, { credentials: "same-origin", cache: "no-store" });
+          if (!res.ok) return [];
+          const data = await res.json();
+          const rows = Array.isArray(data) ? data : (Array.isArray(data?.chats) ? data.chats : []);
+          return rows.map(chat => ({ ...chat, _kind: item.kind }));
+        } catch { return []; }
+      }));
+      return { chats: responses.flat(), isAdmin };
+    } catch { return null; }
   }
 
   async function checkSupportNotificationsV3(force = false) {
     if (supportPolling) return;
     supportPolling = true;
-
     try {
       const result = await getSupportChatsForNotification();
-
       if (!result) return;
-
       const { chats, isAdmin } = result;
-
-      const unreadField = isAdmin
-        ? "unread_admin"
-        : "unread_customer";
-
+      const unreadField = isAdmin ? "unread_admin" : "unread_customer";
       const unreadChats = chats
         .filter(c => Number(c[unreadField] || 0) > 0)
-        .sort(
-          (a, b) =>
-            new Date(b.updated_at || b.support_updated_at || b.last_message_at || 0) -
-            new Date(a.updated_at || a.support_updated_at || a.last_message_at || 0)
-        );
-
-      const unreadTotal = unreadChats.reduce(
-        (sum, c) => sum + Number(c[unreadField] || 0),
-        0
-      );
-
+        .sort((a, b) => new Date(b.updated_at || b.support_updated_at || b.last_message_at || 0) - new Date(a.updated_at || a.support_updated_at || a.last_message_at || 0));
+      const unreadTotal = unreadChats.reduce((sum, c) => sum + Number(c[unreadField] || 0), 0);
       updateSupportBadges(unreadTotal);
 
-      const signature = unreadChats
-        .map(
-          c =>
-            `${c.id}:${Number(c[unreadField] || 0)}:${c.last_message_at || ""}`
-        )
-        .join("|");
-
+      const signature = unreadChats.map(c => `${c._kind}:${c.id ?? c.order_id ?? c.orderId ?? "?"}:${Number(c[unreadField] || 0)}:${c.last_message_at || c.updated_at || ""}`).join("|");
       if (!supportNotificationReady) {
         lastUnreadSupport = signature;
         supportNotificationReady = true;
         return;
       }
-
-      if (!force && signature === lastUnreadSupport) {
-        return;
-      }
-
+      if (!force && signature === lastUnreadSupport) return;
       const previous = lastUnreadSupport;
       lastUnreadSupport = signature;
-
-      if (!previous && unreadTotal === 0) {
-        return;
-      }
-
+      if (!previous && unreadTotal === 0) return;
       if (unreadTotal <= 0) return;
 
+      // Avisa apenas sobre a conversa mais recente com mensagens não lidas.
       const newest = unreadChats[0];
-
       if (!newest) return;
-
-      const customerName =
-        newest.customer_name || "Cliente";
-
-      const orderId = Number(newest.id);
-
-      const title = isAdmin
-        ? "Nova mensagem no atendimento"
-        : "O atendimento respondeu";
-
+      const kind = newest._kind === "general" ? "general" : "order";
+      const chatId = Number(kind === "general" ? newest.id : (newest.order_id ?? newest.id));
+      const customerName = newest.customer_name || newest.user_name || newest.name || "Cliente";
+      const title = isAdmin ? "Nova mensagem no atendimento" : "O atendimento respondeu";
+      const subject = kind === "general" ? `Atendimento geral #${chatId}` : `Pedido #${chatId}`;
       const textMessage = isAdmin
-        ? `${customerName} enviou uma nova mensagem sobre o Pedido #${orderId}.`
-        : `A equipe respondeu sobre o Pedido #${orderId}.`;
+        ? `${customerName} enviou uma nova mensagem — ${subject}.`
+        : `A equipe respondeu — ${subject}.`;
 
-      showSupportToast(
-        title,
-        textMessage,
-        orderId
-      );
-
-      if (
-        typeof navigator !== "undefined" &&
-        "vibrate" in navigator
-      ) {
-        try {
-          navigator.vibrate([100, 60, 100]);
-        } catch {}
+      showSupportToast(title, textMessage, chatId, kind, isAdmin);
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        try { navigator.vibrate([100, 60, 100]); } catch {}
       }
-
-      // Notificação nativa, quando já autorizada.
-      if (
-        typeof Notification !== "undefined" &&
-        Notification.permission === "granted"
-      ) {
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
         try {
           const notification = new Notification(title, {
             body: textMessage,
-            tag: `machado-support-${orderId}`,
+            tag: `machado-support-${kind}-${chatId}`,
             renotify: true
           });
-
           notification.onclick = () => {
             window.focus();
-            window.openOrderChatModal(orderId);
+            if (kind === "general") location.hash = isAdmin ? "#/admin/suporte" : "#/suporte";
+            else if (chatId && typeof window.openOrderChatModal === "function") window.openOrderChatModal(chatId);
             notification.close();
           };
         } catch {}
@@ -5600,13 +5327,17 @@ if (!window.__chatPollInterval) {
                 m.sender_name ||
                 (customer ? "Cliente" : "Atendimento");
 
-              const senderLabel =
-                customer
-                  ? (
-                      isAdmin
-                        ? `👤 Cliente · ${senderName}`
-                        : "👤 Você"
-                    )
+              const ownerMessage = !customer && /dono|propriet[aá]rio|hiury/i.test(String(m.sender_name || ""));
+              const cleanSenderName = String(m.sender_name || "Atendimento")
+                .replace(/[👑⭐🏆]/gu, "")
+                .replace(/\bDONO\b/gi, "")
+                .replace(/^\s*(?:🛠️?\s*)?Atendimento\s*[·•—-]?\s*/i, "")
+                .replace(/\s*[·•—-]\s*/g, " ")
+                .replace(/\s+/g, " ").trim() || "Hiury Machado";
+              const senderLabel = customer
+                ? (isAdmin ? `👤 Cliente · ${senderName}` : "👤 Você")
+                : ownerMessage
+                  ? `👑 PROPRIETÁRIO DA MACHADO EXPRESS · ${cleanSenderName}`
                   : `🛠️ Atendimento · ${senderName}`;
 
               return `
