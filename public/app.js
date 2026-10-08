@@ -409,7 +409,7 @@ function productCard(p){
   const tagEstoque = semEstoque ? `<label style="position:absolute;top:8px;right:8px;background:#ef4444;color:#fff;padding:4px 7px;border-radius:6px;font-size:9px;font-weight:900;">ESGOTADO</label>` : '';
   const textoEstoque = semEstoque ? 'Esgotado' : `Estoque: ${estoque} un.`;
   const corEstoque = semEstoque ? '#ef4444' : '#22c55e';
-  const pJson = JSON.stringify(p).replace(/'/g, "&#39;");
+  window.__currentProduct = p;
   return `<article class="product-card" style="display:flex;flex-direction:column;height:100%;background:#0c1322;border:1px solid rgba(255,255,255,0.08);border-radius:14px;overflow:hidden;">
     <div class="product-image" onclick="location.hash='#/produto/${p.id}'" style="cursor:pointer;position:relative;width:100%;aspect-ratio:1/1;background:#04070d;display:flex;align-items:center;justify-content:center;">
       ${imgHtml}
@@ -3005,10 +3005,10 @@ window.productDetail = async function(id) {
           </div>
 
           <div style="display:flex;flex-direction:column;gap:10px;margin-top:auto;">
-            <button type="button" onclick="buyNowProduct(${pJson})" ${semEstoque?'disabled':''} style="width:100%;background:linear-gradient(135deg,#06b6d4,#0284c7);color:#041019;border:none;padding:14px;border-radius:12px;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 0 15px rgba(6,182,212,0.4);">
+            <button type="button" onclick="buyNowProduct()" ${semEstoque?'disabled':''} style="width:100%;background:linear-gradient(135deg,#06b6d4,#0284c7);color:#041019;border:none;padding:14px;border-radius:12px;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 0 15px rgba(6,182,212,0.4);">
               ${semEstoque?'Produto Esgotado':'Comprar Agora (Direto ao Pagamento)'}
             </button>
-            <button type="button" onclick="addCustomQtyCart(${pJson})" ${semEstoque?'disabled':''} style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#fff;padding:12px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;">
+            <button type="button" onclick="addCustomQtyCart()" ${semEstoque?'disabled':''} style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#fff;padding:12px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;">
               Adicionar ao Carrinho 🛒
             </button>
           </div>
@@ -3024,7 +3024,9 @@ window.productDetail = async function(id) {
   `;
 };
 
-window.buyNowProduct = function(p) {
+window.buyNowProduct = function() {
+  const p = window.__currentProduct;
+  if (!p) return;
   const qty = Number(document.getElementById('pDetailQty')?.innerText || 1);
   for (let i = 0; i < qty; i++) {
     addCart(p);
@@ -3032,7 +3034,9 @@ window.buyNowProduct = function(p) {
   openCheckoutPanel();
 };
 
-window.addCustomQtyCart = function(p) {
+window.addCustomQtyCart = function() {
+  const p = window.__currentProduct;
+  if (!p) return;
   const qty = Number(document.getElementById('pDetailQty')?.innerText || 1);
   for (let i = 0; i < qty; i++) {
     addCart(p);
