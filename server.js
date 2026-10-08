@@ -1110,6 +1110,7 @@ app.get("/api/admin/support/chats", admin, (req, res) => {
         0,
         MAX(om.created_at)
       FROM order_messages om
+      JOIN orders o ON o.id = om.order_id
       GROUP BY om.order_id
     `);
 
@@ -1190,6 +1191,7 @@ app.get("/api/me/support/chats", auth, (req, res) => {
         0,
         MAX(om.created_at)
       FROM order_messages om
+      JOIN orders o ON o.id = om.order_id
       GROUP BY om.order_id
     `);
 
