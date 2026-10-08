@@ -1069,3 +1069,38 @@ app.delete("/api/admin/categories/:id", admin, (req, res) => {
 });
 
 app.get("*",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
+
+/*
+ * Inicialização do servidor
+ *
+ * O Render fornece process.env.PORT.
+ * Localmente usamos 3000.
+ */
+const SERVER_PORT = Number(process.env.PORT) || 3000;
+
+const server = app.listen(SERVER_PORT, "0.0.0.0", () => {
+  console.log(`[SERVER] Machado Express rodando na porta ${SERVER_PORT}`);
+});
+
+server.on("error", (error) => {
+  console.error("[SERVER] Erro ao iniciar servidor:", error);
+  process.exit(1);
+});
+
+process.on("SIGTERM", () => {
+  console.log("[SERVER] SIGTERM recebido. Encerrando...");
+
+  server.close(() => {
+    console.log("[SERVER] Servidor encerrado.");
+    process.exit(0);
+  });
+});
+
+process.on("SIGINT", () => {
+  console.log("[SERVER] SIGINT recebido. Encerrando...");
+
+  server.close(() => {
+    console.log("[SERVER] Servidor encerrado.");
+    process.exit(0);
+  });
+});
