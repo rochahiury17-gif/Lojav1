@@ -607,6 +607,101 @@ footer a {
 </style>
 <!-- /MACHADOEXPRESS HOME REDESIGN V4 -->
 
+
+<!-- MACHADOEXPRESS HOME VISUAL FINAL -->
+<style id="machado-home-final">
+@media (max-width: 700px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  main, #app, .app, .page-content {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Cartões de produto */
+  .products, .product-grid, .products-grid,
+  #products, #product-list, .product-list,
+  .catalog-grid, .shop-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  .products > *, .product-grid > *,
+  .products-grid > *, #products > *,
+  #product-list > *, .product-list > *,
+  .catalog-grid > *, .shop-grid > * {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    border-radius: 15px !important;
+    border: 1px solid #263747 !important;
+    background: linear-gradient(145deg,#121c2a,#090f18) !important;
+  }
+
+  .products img, .product-grid img,
+  .products-grid img, #products img,
+  #product-list img, .product-list img,
+  .catalog-grid img, .shop-grid img {
+    max-width: 100%;
+    object-fit: contain;
+  }
+
+  .products h3, .product-grid h3,
+  .products-grid h3, #products h3,
+  #product-list h3, .product-list h3,
+  .catalog-grid h3, .shop-grid h3 {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+    font-size: 14px;
+  }
+
+  .products button, .product-grid button,
+  .products-grid button, #products button,
+  #product-list button, .product-list button,
+  .catalog-grid button, .shop-grid button {
+    max-width: 100%;
+    min-height: 42px;
+    border-radius: 11px;
+    font-weight: 700;
+  }
+
+  /* Seções mais compactas */
+  main section, #app section, .page-content section {
+    margin-bottom: 20px;
+  }
+
+  /* Evita textos longos estourarem a largura */
+  p, h1, h2, h3, a, button {
+    overflow-wrap: anywhere;
+  }
+
+  footer {
+    overflow: hidden;
+  }
+}
+
+@media (min-width: 701px) {
+  .products, .product-grid, .products-grid,
+  #products, #product-list, .product-list,
+  .catalog-grid, .shop-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+  }
+}
+</style>
+<!-- /MACHADOEXPRESS HOME VISUAL FINAL -->
+
 </head>
 <body>
 <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
