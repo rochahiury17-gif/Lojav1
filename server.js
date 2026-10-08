@@ -1231,9 +1231,10 @@ app.get("/api/me/support/general-chats/:id/messages", auth, (req, res) => {
     const chatId = Number(req.params.id);
 
     const chat = db.prepare(`
-      SELECT *
-      FROM support_chats
-      WHERE id=? AND user_id=?
+      SELECT sc.*, au.name AS assigned_admin_name
+      FROM support_chats sc
+      LEFT JOIN users au ON au.id=sc.assigned_admin_id
+      WHERE sc.id=? AND sc.user_id=?
     `).get(chatId, u.id);
 
     if (!chat) {
@@ -1493,11 +1494,12 @@ app.post("/api/admin/support/general-chats/:id/assume", admin, (req, res) => {
     let welcomeSent = false;
 
     if (!alreadyAssigned) {
-      const name = u.name || "Atendimento";
+      const name = "👑 DONO 👑 Hiury Machado";
 
       const welcome =
-        `👋 Olá! Eu sou ${name}, da equipe Machado Express, e acabei de assumir seu atendimento. ` +
-        `Seja bem-vindo(a)! Como posso ajudar? Conte pra mim o que você precisa.`;
+        `Olá! Seja muito bem-vindo(a) à Machado Express! 👋\n\n` +
+        `Sou Hiury Machado, proprietário da loja, e será um prazer cuidar do seu atendimento pessoalmente.\n\n` +
+        `Conte comigo! Estou aqui para esclarecer suas dúvidas e ajudar você no que precisar. 😊`;
 
       db.prepare(`
         INSERT INTO support_chat_messages
@@ -1521,7 +1523,7 @@ app.post("/api/admin/support/general-chats/:id/assume", admin, (req, res) => {
       ok: true,
       status: "andamento",
       assigned_admin_id: Number(u.id),
-      assigned_admin_name: u.name || "Atendimento",
+      assigned_admin_name: "👑 DONO 👑 Hiury Machado",
       welcome_sent: welcomeSent
     });
   } catch(e) {
@@ -1567,7 +1569,7 @@ app.post("/api/admin/support/general-chats/:id/messages", admin, (req, res) => {
     `).run(
       chatId,
       u.id,
-      u.name || "Atendimento",
+      "👑 DONO 👑 Hiury Machado",
       msg,
       now
     );
@@ -1938,7 +1940,9 @@ app.post("/api/admin/support/:orderId/assume", admin, (req, res) => {
 
     if (previousAssigned !== adminId) {
       const welcome =
-        `👋 Olá! Eu sou ${adminName}, da equipe Machado Express, e acabei de assumir seu atendimento. Seja bem-vindo(a)! Como posso ajudar? Conte pra mim o que você precisa.`;
+        `Olá! Seja muito bem-vindo(a) à Machado Express! 👋\n\n` +
+        `Sou ${adminName}, e será um prazer cuidar do seu atendimento pessoalmente.\n\n` +
+        `Conte comigo! Estou aqui para esclarecer suas dúvidas e ajudar você no que precisar. 😊`;
 
       db.prepare(`
         INSERT INTO order_messages
