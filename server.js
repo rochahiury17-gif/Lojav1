@@ -760,6 +760,19 @@ app.post("/api/admin/orders/bulk-delete", admin, (req, res) => {
   }
 });
 
+
+// Buscar historico de pedidos de um cliente especifico (Admin)
+app.get("/api/admin/customers/:id/orders", admin, (req, res) => {
+  const userId = Number(req.params.id);
+  if (!Number.isInteger(userId) || userId < 1) return res.status(400).json({ error: "ID de cliente invalido." });
+  try {
+    const orders = db.prepare(`SELECT id, status, payment_status, payment_method, total, created_at, tracking FROM orders WHERE user_id = ? ORDER BY id DESC`).all(userId);
+    res.json(orders);
+  } catch(e) {
+    res.status(500).json({ error: "Erro ao buscar pedidos do cliente." });
+  }
+});
+
 app.get("/api/admin/customers", admin, (req, res) => {
   try {
     const sql = `

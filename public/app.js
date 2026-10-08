@@ -989,6 +989,13 @@ function adminOrderRender(){
       <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px">
         <span style="background:rgba(255,255,255,.07);padding:6px 9px;border-radius:7px;font-size:12px">Pagamento: ${esc(adminPaymentStatusLabel(o.payment_status))}</span>
         <span style="background:rgba(255,255,255,.07);padding:6px 9px;border-radius:7px;font-size:12px">Forma: ${esc(o.payment_method==="pix"?"Pix":o.payment_method||"Não informada")}</span>
+        ${(() => {
+          let p = String(o.customer_phone || "").replace(/\D/g, "");
+          if (p.length === 10 || p.length === 11) p = "55" + p;
+          if (!p) return "";
+          const msg = encodeURIComponent("Ola " + (o.customer_name || "") + "! Seu Pedido #" + o.id + " na MachadoExpress foi atualizado. Status: " + (typeof adminOrderStatusLabel === 'function' ? adminOrderStatusLabel(o.status) : o.status) + (o.tracking ? (" | Rastreio: " + o.tracking) : "") + ".");
+          return `<a href="https://wa.me/${p}?text=${msg}" target="_blank" rel="noopener" style="background:#22c55e;color:#041019;padding:6px 10px;border-radius:7px;font-size:11px;font-weight:800;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">💬 Avisar no WhatsApp</a>`;
+        })()}
       </div>
       <div style="margin-top:12px;padding:11px;border-radius:9px;background:rgba(0,0,0,.16);border:1px solid rgba(255,255,255,.07)">
         <b style="display:block;font-size:13px;margin-bottom:7px">Produtos do pedido</b>
@@ -2188,4 +2195,69 @@ window.adminBulkDeleteOrders = async function() {
     if (typeof toast === "function") toast(res.message || "Pedidos excluidos!", "ok");
     adminOrders();
   } catch(err) { alert((err && err.message) || "Erro ao excluir pedidos."); }
+};
+
+
+// Ficha completa e interativa do cliente (Fase 2)
+window.openCustomerDetailsModal = async function(id) {
+  id = Number(id);
+  const modal = document.getElementById("modal");
+  if (!modal) return;
+  modal.innerHTML = `
+    <div class="panel" style="max-width:540px;width:94%;margin:24px auto;max-height:88vh;overflow-y:auto;border-radius:16px;border:1px solid rgba(34,211,238,0.3);background:#09121d;box-shadow:0 12px 40px rgba(0,0,0,0.85);padding:20px;position:relative;">
+      <button class="modal-x" onclick="closeModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button>
+      <div style="text-align:center;padding:20px;color:#22d3ee;">Carregando dados do cliente...</div>
+    </div>
+  `;
+  modal.classList.remove("hidden");
+  try {
+    const clients = await api("/api/admin/customers");
+    const c = (Array.isArray(clients) ? clients : []).find(x => Number(x.id) === id);
+    if (!c) { alert("Cliente nao encontrado."); closeModal(); return; }
+    let clientOrders = [];
+    try {
+      clientOrders = await api("/api/admin/customers/" + id + "/orders");
+      if (!Array.isArray(clientOrders)) clientOrders = [];
+    } catch(err) { clientOrders = []; }
+    let cleanPhone = String(c.phone || "").replace(/\D/g, "");
+    if (cleanPhone.length === 10 || cleanPhone.length === 11) cleanPhone = "55" + cleanPhone;
+    const waLink = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent("Ola " + (c.name || "") + "! Tudo bem? Falamos da MachadoExpress.")}` : "";
+    let cadDate = "Nao informada";
+    if (c.created_at) {
+      try {
+        const d = new Date(String(c.created_at).includes("T") ? c.created_at : String(c.created_at).replace(" ", "T") + "Z");
+        cadDate = Number.isNaN(d.getTime()) ? c.created_at : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+      } catch(e) {}
+    }
+    modal.innerHTML = `
+      <div class="panel" style="max-width:560px;width:94%;margin:20px auto;max-height:90vh;overflow-y:auto;border-radius:16px;border:1px solid rgba(34,211,238,0.3);background:#09121d;box-shadow:0 16px 45px rgba(0,0,0,0.9);padding:20px;position:relative;box-sizing:border-box;">
+        <button class="modal-x" onclick="closeModal()" style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,0.1);border:none;border-radius:8px;color:#fff;width:30px;height:30px;font-size:14px;font-weight:bold;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">✕</button>
+        <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:12px;margin-bottom:14px;">
+          <span style="color:#22d3ee;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;">FICHA DO CLIENTE #${c.id}</span>
+          <h2 style="margin:4px 0 0;font-size:20px;color:#fff;font-weight:800;">${esc(c.name)}</h2>
+          <small style="color:#94a3b8;font-size:12px;">Cadastrado em: ${esc(cadDate)}</small>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;background:rgba(255,255,255,0.035);padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.06);font-size:12px;">
+          <div><span style="color:#8995a7;font-size:10px;text-transform:uppercase;font-weight:bold;display:block;">CPF:</span><b style="color:#fff;font-size:13px;">${esc(c.cpf || "Nao informado")}</b></div>
+          <div><span style="color:#8995a7;font-size:10px;text-transform:uppercase;font-weight:bold;display:block;">WhatsApp / Telefone:</span><div style="display:flex;align-items:center;gap:6px;margin-top:2px;"><span style="color:#22d3ee;font-weight:bold;font-size:13px;">${esc(c.phone || "Nao informado")}</span>${waLink ? `<a href="${waLink}" target="_blank" rel="noopener" style="background:#22c55e;color:#041019;padding:3px 7px;border-radius:6px;font-size:10px;font-weight:900;text-decoration:none;">💬 Chamar</a>` : ""}</div></div>
+          <div style="grid-column:span 2;"><span style="color:#8995a7;font-size:10px;text-transform:uppercase;font-weight:bold;display:block;">E-mail:</span><span style="color:#fff;overflow-wrap:anywhere;">${esc(c.email || "Nao informado")}</span></div>
+          <div style="grid-column:span 2;"><span style="color:#8995a7;font-size:10px;text-transform:uppercase;font-weight:bold;display:block;">Endereco de Entrega:</span><span style="color:#cbd5e1;line-height:1.4;">${esc(c.full_address || "Nenhum endereco cadastrado")}</span></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.25);border-radius:10px;padding:10px 14px;">
+          <div><span style="color:#94a3b8;font-size:11px;text-transform:uppercase;display:block;">Total de compras:</span><b style="color:#22d3ee;font-size:16px;">${clientOrders.length} pedido(s)</b></div>
+          <div style="text-align:right;"><span style="color:#94a3b8;font-size:11px;text-transform:uppercase;display:block;">Total gasto:</span><b style="color:#22c55e;font-size:16px;">${money(c.total_spent || 0)}</b></div>
+        </div>
+        <div>
+          <h3 style="font-size:12px;color:#38bdf8;margin:0 0 8px;text-transform:uppercase;font-weight:800;letter-spacing:0.5px;">Historico de Pedidos (${clientOrders.length})</h3>
+          ${clientOrders.length ? clientOrders.map(o => `
+            <div style="padding:10px 12px;border:1px solid rgba(255,255,255,0.08);border-radius:10px;margin-bottom:8px;background:rgba(0,0,0,0.3);display:flex;justify-content:space-between;align-items:center;gap:10px;">
+              <div><b style="color:#fff;font-size:14px;">Pedido #${o.id}</b><small style="display:block;color:#94a3b8;font-size:11px;margin-top:2px;">${o.created_at ? new Date(o.created_at).toLocaleDateString("pt-BR") : "Data nao informada"} · ${money(o.total)}</small>${o.tracking ? `<small style="display:block;color:#38bdf8;font-size:11px;">Rastreio: ${esc(o.tracking)}</small>` : ""}</div>
+              <div style="text-align:right;"><span style="display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:bold;background:rgba(34,211,238,0.15);color:#67e8f9;border:1px solid rgba(34,211,238,0.3);">${typeof adminOrderStatusLabel === "function" ? esc(adminOrderStatusLabel(o.status)) : esc(o.status)}</span><button type="button" onclick="closeModal();window.location.hash='#/admin/pedidos'" style="display:block;margin-top:6px;background:none;border:none;color:#38bdf8;font-size:11px;font-weight:bold;cursor:pointer;text-decoration:underline;">Ver pedido ↗</button></div>
+            </div>
+          `).join("") : `<p style="color:#94a3b8;font-size:12px;text-align:center;padding:12px 0;">Este cliente ainda nao realizou pedidos.</p>`}
+        </div>
+        ${waLink ? `<div style="margin-top:16px;"><a href="${waLink}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#22c55e;color:#041019;font-weight:900;font-size:13px;padding:12px;border-radius:10px;text-decoration:none;box-shadow:0 0 15px rgba(34,197,94,0.35);">💬 Conversar no WhatsApp</a></div>` : ""}
+      </div>
+    `;
+  } catch(err) { alert("Erro ao abrir ficha do cliente."); closeModal(); }
 };
