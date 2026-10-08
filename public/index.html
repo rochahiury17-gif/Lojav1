@@ -23,6 +23,104 @@
   }
 </style>
 
+
+<style>
+/* MACHADOEXPRESS VISUAL SUPORTE V2 */
+body.support-page #app {
+  width: min(100% - 28px, 1080px) !important;
+  margin: 0 auto !important;
+  padding: 26px 0 42px !important;
+  box-sizing: border-box;
+  color: #172033;
+}
+body.support-page #app section,
+body.support-page #app .support-center,
+body.support-page #app .support-container,
+body.support-page #app .support-shell,
+body.support-page #app .support-layout,
+body.support-page #app .support-card,
+body.support-page #app .chat-panel,
+body.support-page #app .chat-layout {
+  border-radius: 20px !important;
+}
+body.support-page #app .support-center,
+body.support-page #app .support-container,
+body.support-page #app .support-shell,
+body.support-page #app .support-layout {
+  overflow: hidden;
+  background: #fff !important;
+  border: 1px solid #e5eaf2 !important;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, .08) !important;
+}
+body.support-page #app h1,
+body.support-page #app h2,
+body.support-page #app h3 {
+  color: #172033;
+  letter-spacing: -.025em;
+  line-height: 1.25;
+}
+body.support-page #app p {
+  line-height: 1.65;
+}
+body.support-page #app button,
+body.support-page #app a[role="button"],
+body.support-page #app input[type="submit"] {
+  min-height: 42px;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  cursor: pointer;
+  transition: filter .18s ease, transform .18s ease;
+}
+body.support-page #app button:hover,
+body.support-page #app a[role="button"]:hover {
+  filter: brightness(.96);
+}
+body.support-page #app input,
+body.support-page #app textarea,
+body.support-page #app select {
+  box-sizing: border-box;
+  max-width: 100%;
+  border: 1px solid #d8e0eb !important;
+  border-radius: 12px !important;
+  padding: 12px 14px !important;
+  font: inherit;
+  background: #fff;
+  color: #172033;
+}
+body.support-page #app input:focus,
+body.support-page #app textarea:focus,
+body.support-page #app select:focus {
+  outline: 3px solid rgba(37, 99, 235, .14);
+  border-color: #2563eb !important;
+}
+body.support-page #app [class*="message"],
+body.support-page #app [class*="bubble"] {
+  overflow-wrap: anywhere;
+}
+body.support-page #app img {
+  max-width: 100%;
+  height: auto;
+}
+@media (max-width: 600px) {
+  body.support-page #app {
+    width: calc(100% - 20px) !important;
+    padding: 14px 0 28px !important;
+  }
+  body.support-page #app section,
+  body.support-page #app .support-center,
+  body.support-page #app .support-container,
+  body.support-page #app .support-shell,
+  body.support-page #app .support-layout,
+  body.support-page #app .support-card,
+  body.support-page #app .chat-panel {
+    border-radius: 15px !important;
+  }
+  body.support-page #app h1 { font-size: 25px; }
+  body.support-page #app h2 { font-size: 22px; }
+  body.support-page #app button { max-width: 100%; }
+}
+</style>
+
 </head>
 <body>
 <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
@@ -52,6 +150,22 @@
 <footer id="footer"></footer>
 <script src="/app.js?v=1791464431"></script>
 
+
+
+<script>
+/* MACHADOEXPRESS ROTA VISUAL SUPORTE V2 */
+(function () {
+  function updateSupportAppearance() {
+    var hash = window.location.hash || "#/";
+    document.body.classList.toggle(
+      "support-page",
+      hash === "#/suporte" || hash.startsWith("#/suporte?")
+    );
+  }
+  updateSupportAppearance();
+  window.addEventListener("hashchange", updateSupportAppearance);
+})();
+</script>
 
 </body>
 </html>
