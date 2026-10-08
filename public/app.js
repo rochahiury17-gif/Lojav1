@@ -1161,7 +1161,7 @@ async function adminPosts(){if(!await requireAdmin())return;let ps=await api("/a
 async function generatePost(id,btn){let old=btn.innerHTML;btn.disabled=true;btn.innerHTML="Gerando…";try{let d=await api("/api/admin/posts/generate/"+id,{method:"POST"});toast("Post gerado com sucesso!");let a=document.createElement("a");a.href=d.url;a.target="_blank";a.rel="noopener";a.textContent="Abrir arte gerada";a.className="generated-link";btn.parentElement.appendChild(a)}catch(e){toast(e.message,"warn")}finally{btn.disabled=false;btn.innerHTML=old}}
 async function adminConfig(){if(!await requireAdmin(true))return;let s=await api("/api/admin/settings");adminShell("Configurações",`<div class="config-grid"><form class="panel config-form" onsubmit="saveSettings(event)"><span>IDENTIDADE</span><h3>Home e marca</h3><label>Nome da loja<input name="store_name" value="${esc(s.store_name)}"></label><label>Descrição<textarea name="store_description">${esc(s.store_description)}</textarea></label><label>Imagem do banner<input name="banner_file" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><small class="field-hint">Envie a imagem para ela ficar salva no próprio site. ${s.banner_image?"Banner local atual: "+esc(s.banner_image):"Usando o banner padrão."}</small></label><label>Título do banner<input name="banner_title" value="${esc(s.banner_title)}"></label><label>Texto do banner<textarea name="banner_subtitle">${esc(s.banner_subtitle)}</textarea></label><label>Botão do banner<input name="banner_button" value="${esc(s.banner_button)}"></label><button class="btn primary">Salvar alterações</button></form><form class="panel config-form" onsubmit="saveSettings(event)"><span>CONTATO</span><h3>Informações da loja</h3><label>E-mail<input name="store_email" value="${esc(s.store_email)}"></label><label>Telefone<input name="store_phone" value="${esc(s.store_phone)}"></label><label>WhatsApp<input name="store_whatsapp" value="${esc(s.store_whatsapp)}"></label><span>CHECKOUT</span><h3>Pix e frete</h3><label>Chave Pix<input name="pix_key" value="${esc(s.pix_key)}"></label><label>Nome do recebedor<input name="pix_name" value="${esc(s.pix_name)}"></label><label>Cidade<input name="pix_city" value="${esc(s.pix_city)}"></label><label>Frete grátis acima de R$<input name="free_shipping_min" type="number" step=".01" value="${esc(s.free_shipping_min)}"></label><button class="btn primary">Salvar configurações</button></form></div>`)}
 async function saveSettings(e){e.preventDefault();try{const fd=new FormData(e.target);const body=Object.fromEntries(fd.entries());const banner=fd.get("banner_file");delete body.banner_file;if(banner&&banner.size>0){body.banner_image=await uploadLocalImage(banner)}else{delete body.banner_image;}await api("/api/admin/settings",{method:"PATCH",body:JSON.stringify(body)});await load();toast("Configurações salvas com sucesso!");location.hash="#/admin/config"}catch(x){console.error(x);toast(x.message||"Erro ao salvar configurações","warn");}}
-async function route(){let h=location.hash||"#/";try{if(h.startsWith("#/produto/")){window.scrollTo(0,0);return await productDetail(h.replace("#/produto/","").split("?")[0]);}if(h==="#/"||h==="#")return await home();if(h.startsWith("#/produtos"))return await products();if(h==="#/login")return await login();if(h==="#/registro")return await register();if(h==="#/conta")return await account();if(h==="#/admin")return await admin();if(h==="#/admin/produtos")return await adminProducts();if(h==="#/admin/pedidos")return await adminOrders();if(h==="#/admin/suporte")return await adminSupport();
+async function route(){let h=location.hash||"#/";try{if(h.startsWith("#/produto/")){window.scrollTo(0,0);return await productDetail(h.replace("#/produto/","").split("?")[0]);}if(h==="#/"||h==="#")return await home();if(h.startsWith("#/produtos"))return await products();if(h==="#/login")return await login();if(h==="#/registro")return await register();if(h==="#/conta")return await account();if(h==="#/admin")return await admin();if(h==="#/admin/produtos")return await adminProducts();if(h==="#/admin/pedidos")return await adminOrders();if(h==="#/admin/suporte")return await window.adminSupport();
 if(h==="#/admin/clientes")return await adminCustomers();if(h==="#/admin/equipe")return await adminTeam();if(h==="#/admin/config")return await adminConfig();if(h==="#/admin/posts")return await adminPosts();return await home()}catch(e){toast(e.message,"warn")}}
 window.addEventListener("hashchange",route);load();
 function renderFooter() {
@@ -2498,9 +2498,7 @@ async function adminSupport() {
     </div>
   `;
 
-  window.renderChatList = renderChatList;
 
-  window.renderChatList = renderChatList;
 
   $('#app').innerHTML = `
     <div class="admin-shell">
@@ -2925,6 +2923,11 @@ window.adminSupport = async function() {
       `;
     }).join('');
   };
+
+  // Expor renderer para os eventos inline do painel de atendimento.
+
+  // Chat renderer exposto para eventos do painel.
+  window.renderChatList = renderChatList;
 
   $('#app').innerHTML = `
     <div class="admin-shell">
