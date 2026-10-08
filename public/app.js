@@ -2808,3 +2808,49 @@ window.renderAccount = async function(subTab = 'pedidos') {
     </div>
   `;
 };
+
+// --- MODULO DE SUPORTE ADMIN FORÇADO ---
+window.adminSupport = async function() {
+  if (!store.user || !['super_admin','admin','gerente','atendente'].includes(store.user.role)) {
+    location.hash = '#/login';
+    return;
+  }
+  let chats = [];
+  try {
+    const res = await api('/api/admin/support/chats');
+    chats = await res.json();
+  } catch(e) {
+    chats = [];
+  }
+
+  const items = Array.isArray(chats) && chats.length ? chats.map(c => `
+    <article style="background:linear-gradient(145deg,#0c1322 0%,#090e1a 100%);border:1px solid rgba(56,189,248,.25);border-radius:14px;padding:16px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+        <div>
+          <b style="color:#fff;font-size:15px;">Pedido #${esc(c.id)}</b>
+          <div style="margin-top:4px;font-size:13px;color:#cbd5e1;">👤 ${esc(c.customer_name || 'Cliente')} · 📱 ${esc(c.customer_phone || 'Sem fone')}</div>
+        </div>
+        <strong style="color:#38bdf8;font-size:15px;">R$ ${esc(c.total)}</strong>
+      </div>
+      <div style="margin:10px 0;padding:8px 10px;background:rgba(15,23,42,.6);border-radius:8px;font-size:12px;color:#94a3b8;">
+        <span style="color:#38bdf8;font-weight:bold;">Última msg:</span> ${esc(c.last_message || 'Nenhuma mensagem')}
+      </div>
+      <button type="button" onclick="openOrderChatModal(${Number(c.id)})" style="width:100%;background:linear-gradient(135deg,#06b6d4,#0284c7);color:#fff;border:none;padding:10px;border-radius:8px;font-weight:bold;font-size:12px;cursor:pointer;">
+        💬 Abrir Chat com o Cliente
+      </button>
+    </article>
+  `).join('') : '<div style="text-align:center;padding:30px;color:#94a3b8;background:#0c1322;border-radius:12px;">Nenhum chat de pedido em aberto no momento.</div>';
+
+  $('#app').innerHTML = `
+    <div style="max-width:800px;margin:20px auto;padding:16px;color:#fff;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <div>
+          <span style="color:#38bdf8;font-size:11px;font-weight:bold;text-transform:uppercase;">Central de Atendimento</span>
+          <h2 style="margin:2px 0 0;font-size:20px;">Chat dos Pedidos</h2>
+        </div>
+        <a href="#/admin" style="background:rgba(255,255,255,0.1);color:#fff;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:12px;">← Voltar ao Admin</a>
+      </div>
+      ${items}
+    </div>
+  `;
+};
