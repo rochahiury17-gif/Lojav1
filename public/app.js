@@ -565,11 +565,49 @@ function customerOrdersPanelHtml(){
   const list=shown.length?shown.map(orderTrackingCard).join(""):`<div class="cart-empty"><h3>${orders.length?"Nenhum pedido nesta situação":"Nenhum pedido ainda"}</h3><p>${orders.length?"Escolha outra aba para ver seus pedidos.":"Quando você fizer uma compra, poderá acompanhar as etapas por aqui."}</p>${orders.length?"":`<a class="btn primary" href="#/produtos">Explorar produtos</a>`}</div>`;
   return `<div id="customer-orders-filter-panel"><div style="display:flex;gap:8px;overflow-x:auto;padding:4px 0 10px;margin:0 0 8px">${buttons}</div>${list}</div>`;
 }
-function renderCustomerOrders(orders){
-  window.__customerOrders=Array.isArray(orders)?orders:[];
-  if(!["waiting","progress","delivered","cancelled"].includes(window.__customerOrdersFilter))window.__customerOrdersFilter="waiting";
-  return customerOrdersPanelHtml();
+
+function renderCustomerOrders(orders) {
+  if (!Array.isArray(orders) || orders.length === 0) {
+    return `
+      <div style="text-align:center;padding:30px 15px;color:#94a3b8;">
+        <span style="font-size:28px;display:block;margin-bottom:6px;">📦</span>
+        <h4 style="color:#fff;margin:0 0 4px;font-size:15px;">Nenhum pedido ainda</h4>
+        <p style="font-size:12px;margin:0 0 14px;">Quando você fizer uma compra, poderá acompanhar todas as etapas por aqui.</p>
+        <a href="#/" style="display:inline-block;background:linear-gradient(135deg,#06b6d4,#0284c7);color:#041019;padding:8px 16px;border-radius:8px;font-weight:800;font-size:12px;text-decoration:none;box-shadow:0 0 10px rgba(6,182,212,0.4);">Explorar produtos</a>
+      </div>
+    `;
+  }
+
+  return orders.map(o => {
+    const totalFormatted = typeof money === 'function' ? money(o.total) : ('R$ ' + o.total);
+    const dateStr = esc((o.created_at || '').slice(0, 10));
+    const statusText = esc(orderStatusLabel ? orderStatusLabel(o.status) : o.status);
+    
+    return `
+      <div style="background:linear-gradient(145deg,#0c1322 0%,#090e1a 100%);border:1px solid rgba(34,211,238,0.25);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 4px 15px rgba(0,0,0,0.4);">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:8px;margin-bottom:10px;">
+          <div>
+            <b style="color:#fff;font-size:14px;">Pedido #${esc(o.id)}</b>
+            <small style="display:block;color:#94a3b8;font-size:11px;">Data: ${dateStr}</small>
+          </div>
+          <span style="padding:3px 8px;border-radius:999px;background:rgba(34,211,238,0.15);color:#38bdf8;font-size:11px;font-weight:700;">${statusText}</span>
+        </div>
+
+        <div style="font-size:13px;color:#cbd5e1;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+          <span>Valor total:</span>
+          <strong style="color:#38bdf8;font-size:14px;">${totalFormatted}</strong>
+        </div>
+
+        <div>
+          <button type="button" onclick="openOrderSupportModal(${Number(o.id)}, '${totalFormatted}', '${o.status}')" style="width:100%;box-sizing:border-box;background:linear-gradient(135deg,rgba(34,211,238,0.2),rgba(6,182,212,0.1));border:1px solid #22d3ee;color:#38bdf8;font-weight:800;font-size:12px;padding:10px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+            <span>🎧</span> Suporte do Pedido #${esc(o.id)}
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
+
 function setCustomerOrdersFilter(filter){
   if(!["waiting","progress","delivered","cancelled"].includes(filter))filter="waiting";
   window.__customerOrdersFilter=filter;
