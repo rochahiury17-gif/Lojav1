@@ -2404,7 +2404,11 @@ window.openOrderChatModal = async function(orderId) {
         const align = isAdmin ? "flex-start" : "flex-end";
         const bg = isAdmin ? "rgba(34,211,238,0.15)" : "linear-gradient(135deg,#0284c7,#0369a1)";
         const border = isAdmin ? "1px solid rgba(34,211,238,0.3)" : "none";
-        const roleLabel = isAdmin ? "🎧 Suporte Machado Express" : "👤 Você";
+        const viewerIsAdmin = !!(window.store?.user && ["super_admin","admin","gerente","atendente"].includes(window.store.user.role));
+        const senderName = m.sender_name || (isAdmin ? "Equipe Machado Express" : "Cliente");
+        const roleLabel = isAdmin
+          ? "🛠️ " + senderName
+          : (viewerIsAdmin ? "👤 " + senderName : "👤 Você");
         return `
           <div style="align-self:${align};max-width:82%;background:${bg};border:${border};border-radius:12px;padding:10px 12px;color:#fff;font-size:13px;">
             <div style="font-size:11px;color:${isAdmin?'#38bdf8':'#93c5fd'};font-weight:bold;margin-bottom:3px;">${roleLabel}</div>
@@ -2845,127 +2849,341 @@ window.renderAccount = async function(subTab = 'pedidos') {
 // --- MODULO DE SUPORTE ADMIN FORÇADO ---
 
 
+window.supportStatusInfo = function(status) {
+  const map = {
+    novo: {
+      label: "Novo",
+      icon: "🆕",
+      bg: "rgba(59,130,246,.15)",
+      color: "#60a5fa"
+    },
+    andamento: {
+      label: "Em andamento",
+      icon: "🔵",
+      bg: "rgba(34,211,238,.15)",
+      color: "#38bdf8"
+    },
+    aguardando_cliente: {
+      label: "Aguardando cliente",
+      icon: "🟡",
+      bg: "rgba(234,179,8,.15)",
+      color: "#facc15"
+    },
+    finalizado: {
+      label: "Finalizado",
+      icon: "🟢",
+      bg: "rgba(34,197,94,.15)",
+      color: "#4ade80"
+    }
+  };
+
+  return map[status] || {
+    label: status || "Novo",
+    icon: "💬",
+    bg: "rgba(148,163,184,.15)",
+    color: "#cbd5e1"
+  };
+};
+
+window.supportAdminAction = async function(action, orderId) {
+  try {
+    let url = "";
+
+    if (action === "assume") {
+      url = "/api/admin/support/" + Number(orderId) + "/assume";
+    } else if (action === "finalize") {
+      url = "/api/admin/support/" + Number(orderId) + "/finalize";
+    } else if (action === "reopen") {
+      url = "/api/admin/support/" + Number(orderId) + "/reopen";
+    } else {
+      return;
+    }
+
+    await api(url, {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+
+    await window.adminSupport();
+  } catch (e) {
+    alert("Não foi possível atualizar o atendimento: " + (e.message || e));
+  }
+};
+
 window.adminSupport = async function() {
-  if (!store.user || !['super_admin','admin','gerente','atendente'].includes(store.user.role)) {
-    location.hash = '#/login';
+  if (!store.user || !["super_admin","admin","gerente","atendente"].includes(store.user.role)) {
+    location.hash = "#/login";
     return;
   }
+
   let chats = [];
+
   try {
-    const res = await api('/api/admin/support/chats');
+    const res = await api("/api/admin/support/chats");
     chats = Array.isArray(res) ? res : [];
-  } catch(e) {
+  } catch (e) {
+    console.error("[SUPORTE ADMIN]", e);
     chats = [];
   }
 
   window.__adminChatsCache = chats;
 
-  const renderChatList = (filterTerm = '', statusFilter = 'todos') => {
+  const renderChatList = (filterTerm = "", statusFilter = "todos") => {
     let list = window.__adminChatsCache || [];
+
     if (filterTerm) {
       const term = filterTerm.toLowerCase();
-      list = list.filter(c => 
+
+      list = list.filter(c =>
         String(c.id).includes(term) ||
-        String(c.customer_name || '').toLowerCase().includes(term) ||
-        String(c.customer_phone || '').includes(term)
+        String(c.customer_name || "").toLowerCase().includes(term) ||
+        String(c.customer_phone || "").includes(term)
       );
     }
-    if (statusFilter === 'aguardando') {
-      list = list.filter(c => c.last_sender !== 'admin');
-    } else if (statusFilter === 'respondido') {
-      list = list.filter(c => c.last_sender === 'admin');
+
+    if (statusFilter !== "todos") {
+      list = list.filter(c => (c.support_status || "novo") === statusFilter);
     }
 
     if (!list.length) {
       return `
-        <div style="text-align:center;padding:40px 20px;background:#0c1322;border:1px solid rgba(255,255,255,0.08);border-radius:16px;color:#94a3b8;">
+        <div style="text-align:center;padding:40px 20px;background:#0c1322;border:1px solid rgba(255,255,255,.08);border-radius:16px;color:#94a3b8;">
           <span style="font-size:32px;display:block;margin-bottom:8px;">💬</span>
-          <h3 style="color:#fff;margin:0 0 6px;">Nenhum chamado encontrado</h3>
-          <p style="font-size:13px;margin:0;">Quando os clientes mandarem mensagens sobre os pedidos, eles aparecerão aqui.</p>
+          <h3 style="color:#fff;margin:0 0 6px;">Nenhum atendimento encontrado</h3>
+          <p style="font-size:13px;margin:0;">Os atendimentos aparecerão aqui quando houver mensagens.</p>
         </div>
       `;
     }
 
     return list.map(c => {
-      const waClean = (c.customer_phone || '').replace(/\D/g, '');
-      const waLink = waClean ? `https://wa.me/${waClean.startsWith('55') ? waClean : '55' + waClean}?text=${encodeURIComponent('Olá ' + (c.customer_name || 'Cliente') + '! Falamos do suporte da MachadoExpress sobre seu Pedido #' + c.id)}` : '';
+      const supportStatus = c.support_status || "novo";
+      const info = window.supportStatusInfo(supportStatus);
+
+      const unread = Number(c.unread_admin || 0);
+
+      const waClean = (c.customer_phone || "").replace(/\D/g, "");
+      const waLink = waClean
+        ? `https://wa.me/${waClean.startsWith("55") ? waClean : "55" + waClean}?text=${encodeURIComponent(
+            "Olá " + (c.customer_name || "Cliente") +
+            "! Falamos do suporte da MachadoExpress sobre seu Pedido #" + c.id
+          )}`
+        : "";
+
+      let actionButton = "";
+
+      if (supportStatus === "novo") {
+        actionButton = `
+          <button
+            type="button"
+            onclick="supportAdminAction('assume', ${Number(c.id)})"
+            style="background:rgba(59,130,246,.15);border:1px solid #3b82f6;color:#60a5fa;padding:9px 12px;border-radius:9px;font-weight:800;cursor:pointer;">
+            👋 Assumir
+          </button>
+        `;
+      } else if (supportStatus === "andamento" || supportStatus === "aguardando_cliente") {
+        actionButton = `
+          <button
+            type="button"
+            onclick="supportAdminAction('finalize', ${Number(c.id)})"
+            style="background:rgba(34,197,94,.12);border:1px solid #22c55e;color:#4ade80;padding:9px 12px;border-radius:9px;font-weight:800;cursor:pointer;">
+            ✅ Finalizar
+          </button>
+        `;
+      } else if (supportStatus === "finalizado") {
+        actionButton = `
+          <button
+            type="button"
+            onclick="supportAdminAction('reopen', ${Number(c.id)})"
+            style="background:rgba(234,179,8,.12);border:1px solid #eab308;color:#facc15;padding:9px 12px;border-radius:9px;font-weight:800;cursor:pointer;">
+            🔓 Reabrir
+          </button>
+        `;
+      }
+
       return `
         <article style="background:linear-gradient(145deg,#0c1322 0%,#090e1a 100%);border:1px solid rgba(56,189,248,.25);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 4px 15px rgba(0,0,0,.4);">
+
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
             <div>
-              <div style="display:flex;align-items:center;gap:8px;">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                 <b style="color:#fff;font-size:16px;">Pedido #${esc(c.id)}</b>
-                <span style="font-size:11px;padding:2px 8px;border-radius:999px;background:rgba(34,211,238,.15);color:#38bdf8;font-weight:700;">${esc(c.status || 'Pendente')}</span>
+
+                <span style="font-size:11px;padding:3px 9px;border-radius:999px;background:${info.bg};color:${info.color};font-weight:800;">
+                  ${info.icon} ${esc(info.label)}
+                </span>
+
+                ${unread > 0 ? `
+                  <span style="font-size:10px;padding:3px 8px;border-radius:999px;background:#ef4444;color:#fff;font-weight:900;">
+                    ${unread} nova${unread > 1 ? "s" : ""}
+                  </span>
+                ` : ""}
               </div>
-              <div style="margin-top:6px;font-size:13px;color:#cbd5e1;">
-                <strong>👤 ${esc(c.customer_name || 'Cliente')}</strong> · <span>📱 ${esc(c.customer_phone || 'Sem telefone')}</span>
+
+              <div style="margin-top:7px;font-size:13px;color:#cbd5e1;">
+                <strong>👤 ${esc(c.customer_name || "Cliente")}</strong>
+                ·
+                <span>📱 ${esc(c.customer_phone || "Sem telefone")}</span>
               </div>
             </div>
+
             <div style="text-align:right;">
-              <strong style="color:#38bdf8;font-size:16px;">${typeof money === 'function' ? money(c.total) : ('R$ ' + c.total)}</strong>
-              <small style="display:block;color:#94a3b8;font-size:11px;">${esc(c.message_count || 0)} mensagens</small>
+              <strong style="color:#38bdf8;font-size:16px;">
+                ${typeof money === "function" ? money(c.total) : ("R$ " + c.total)}
+              </strong>
+
+              <small style="display:block;color:#94a3b8;font-size:11px;">
+                ${esc(c.message_count || 0)} mensagens
+              </small>
             </div>
           </div>
+
           <div style="margin:12px 0;padding:10px 12px;background:rgba(15,23,42,.6);border-radius:10px;border:1px solid rgba(255,255,255,.06);font-size:13px;color:#94a3b8;">
-            <span style="color:#38bdf8;font-weight:bold;">Última mensagem:</span> ${esc(c.last_message || 'Nenhuma mensagem')}
+            <span style="color:#38bdf8;font-weight:bold;">Última mensagem:</span>
+            ${esc(c.last_message || "Nenhuma mensagem")}
           </div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <button type="button" onclick="openOrderChatModal(${Number(c.id)})" style="flex:1;min-width:140px;background:linear-gradient(135deg,#06b6d4,#0284c7);color:#fff;border:none;padding:10px 14px;border-radius:10px;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
-              💬 Abrir Chat no Site
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+
+            <button
+              type="button"
+              onclick="openOrderChatModal(${Number(c.id)})"
+              style="flex:1;min-width:145px;background:linear-gradient(135deg,#06b6d4,#0284c7);color:#fff;border:none;padding:10px 14px;border-radius:10px;font-weight:800;font-size:13px;cursor:pointer;">
+              💬 Abrir Chat
             </button>
+
+            ${actionButton}
+
             ${waLink ? `
-              <a href="${waLink}" target="_blank" rel="noopener noreferrer" style="background:rgba(37,211,102,.12);border:1px solid #25d366;color:#4ade80;padding:10px 14px;border-radius:10px;font-weight:700;font-size:13px;text-decoration:none;display:flex;align-items:center;gap:6px;">
-                📲 WhatsApp do Cliente
+              <a
+                href="${waLink}"
+                target="_blank"
+                rel="noopener noreferrer"
+                style="background:rgba(37,211,102,.12);border:1px solid #25d366;color:#4ade80;padding:10px 14px;border-radius:10px;font-weight:700;font-size:13px;text-decoration:none;display:flex;align-items:center;gap:6px;">
+                📲 WhatsApp
               </a>
-            ` : ''}
+            ` : ""}
           </div>
         </article>
       `;
-    }).join('');
+    }).join("");
   };
 
-  // Expor renderer para os eventos inline do painel de atendimento.
-
-  // Chat renderer exposto para eventos do painel.
   window.renderChatList = renderChatList;
 
-  $('#app').innerHTML = `
+  const countStatus = status =>
+    chats.filter(c => (c.support_status || "novo") === status).length;
+
+  const unreadTotal = chats.reduce(
+    (sum, c) => sum + Number(c.unread_admin || 0),
+    0
+  );
+
+  $("#app").innerHTML = `
     <div class="admin-shell">
+
       <aside class="admin-side">
         <div class="admin-user-box">
           <b>${esc(store.user.name)}</b>
           <small>${esc(store.user.role)}</small>
         </div>
+
         <a href="#/admin">◈ Dashboard</a>
         <a href="#/admin/produtos">▣ Produtos</a>
         <a href="#/admin/pedidos">⌁ Pedidos</a>
         <a href="#/admin/clientes">◎ Clientes</a>
-        <a href="#/admin/suporte" style="background:rgba(34,211,238,0.15);color:#38bdf8;font-weight:bold;">💬 Atendimento / Chat</a>
+
+        <a href="#/admin/suporte" style="background:rgba(34,211,238,.15);color:#38bdf8;font-weight:bold;">
+          💬 Atendimento / Chat
+        </a>
+
         <a href="#/admin/equipe">◇ Equipe</a>
         <a href="#/admin/posts">▤ Gerar posts</a>
         <a href="#/admin/config">⚙ Configurações</a>
+
         <button onclick="logout()">↪ Sair</button>
       </aside>
+
       <main class="admin-main">
+
         <div class="panel-head" style="margin-bottom:16px;">
           <div>
-            <span style="color:#38bdf8;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;">CENTRAL DE ATENDIMENTO</span>
-            <h2 style="font-size:22px;color:#fff;margin:2px 0 0;">Chat dos Pedidos</h2>
+            <span style="color:#38bdf8;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;">
+              CENTRAL DE ATENDIMENTO
+            </span>
+
+            <h2 style="font-size:22px;color:#fff;margin:2px 0 0;">
+              Chat dos Pedidos
+            </h2>
+          </div>
+
+          <div style="font-size:12px;color:#94a3b8;">
+            ${unreadTotal > 0 ? `🔴 ${unreadTotal} mensagem(ns) nova(s)` : "✓ Tudo lido"}
           </div>
         </div>
 
-        <div style="background:#0c1322;border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:14px;margin-bottom:16px;">
-          <input id="adminChatSearch" placeholder="🔍 Buscar por Nº do pedido, nome do cliente ou telefone..." style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 14px;color:#fff;font-size:13px;outline:none;" oninput="document.getElementById('adminChatListContainer').innerHTML = renderChatList(this.value, document.querySelector('.chat-filter-btn.active')?.dataset.status || 'todos')">
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:14px;">
+          ${[
+            ["novo","🆕","Novos"],
+            ["andamento","🔵","Em andamento"],
+            ["aguardando_cliente","🟡","Aguardando"],
+            ["finalizado","🟢","Finalizados"]
+          ].map(([key,icon,label]) => `
+            <div style="background:#0c1322;border:1px solid rgba(255,255,255,.08);border-radius:11px;padding:10px;">
+              <div style="font-size:11px;color:#94a3b8;">${icon} ${label}</div>
+              <strong style="display:block;color:#fff;font-size:18px;margin-top:3px;">
+                ${countStatus(key)}
+              </strong>
+            </div>
+          `).join("")}
+        </div>
+
+        <div style="background:#0c1322;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;margin-bottom:16px;">
+
+          <input
+            id="adminChatSearch"
+            placeholder="🔍 Buscar por Nº do pedido, nome do cliente ou telefone..."
+            style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 14px;color:#fff;font-size:13px;outline:none;"
+            oninput="document.getElementById('adminChatListContainer').innerHTML = renderChatList(this.value, document.querySelector('.chat-filter-btn.active')?.dataset.status || 'todos')"
+          >
+
           <div style="display:flex;gap:8px;margin-top:10px;overflow-x:auto;">
-            <button type="button" class="chat-filter-btn active" data-status="todos" onclick="document.querySelectorAll('.chat-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('adminChatListContainer').innerHTML = renderChatList(document.getElementById('adminChatSearch').value, 'todos')" style="background:#0284c7;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">Todos</button>
-            <button type="button" class="chat-filter-btn" data-status="aguardando" onclick="document.querySelectorAll('.chat-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('adminChatListContainer').innerHTML = renderChatList(document.getElementById('adminChatSearch').value, 'aguardando')" style="background:rgba(255,255,255,0.06);color:#cbd5e1;border:1px solid rgba(255,255,255,0.1);padding:6px 12px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">Aguardando Resposta</button>
-            <button type="button" class="chat-filter-btn" data-status="respondido" onclick="document.querySelectorAll('.chat-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('adminChatListContainer').innerHTML = renderChatList(document.getElementById('adminChatSearch').value, 'respondido')" style="background:rgba(255,255,255,0.06);color:#cbd5e1;border:1px solid rgba(255,255,255,0.1);padding:6px 12px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">Respondidos</button>
+
+            <button type="button" class="chat-filter-btn active" data-status="todos"
+              onclick="document.querySelectorAll('.chat-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('adminChatListContainer').innerHTML=renderChatList(document.getElementById('adminChatSearch').value,'todos')"
+              style="background:#0284c7;color:#fff;border:none;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">
+              Todos
+            </button>
+
+            <button type="button" class="chat-filter-btn" data-status="novo"
+              onclick="document.querySelectorAll('.chat-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('adminChatListContainer').innerHTML=renderChatList(document.getElementById('adminChatSearch').value,'novo')"
+              style="background:rgba(255,255,255,.06);color:#cbd5e1;border:1px solid rgba(255,255,255,.1);padding:7px 12px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">
+              🆕 Novos
+            </button>
+
+            <button type="button" class="chat-filter-btn" data-status="andamento"
+              onclick="document.querySelectorAll('.chat-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('adminChatListContainer').innerHTML=renderChatList(document.getElementById('adminChatSearch').value,'andamento')"
+              style="background:rgba(255,255,255,.06);color:#cbd5e1;border:1px solid rgba(255,255,255,.1);padding:7px 12px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">
+              🔵 Andamento
+            </button>
+
+            <button type="button" class="chat-filter-btn" data-status="aguardando_cliente"
+              onclick="document.querySelectorAll('.chat-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('adminChatListContainer').innerHTML=renderChatList(document.getElementById('adminChatSearch').value,'aguardando_cliente')"
+              style="background:rgba(255,255,255,.06);color:#cbd5e1;border:1px solid rgba(255,255,255,.1);padding:7px 12px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">
+              🟡 Aguardando
+            </button>
+
+            <button type="button" class="chat-filter-btn" data-status="finalizado"
+              onclick="document.querySelectorAll('.chat-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('adminChatListContainer').innerHTML=renderChatList(document.getElementById('adminChatSearch').value,'finalizado')"
+              style="background:rgba(255,255,255,.06);color:#cbd5e1;border:1px solid rgba(255,255,255,.1);padding:7px 12px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">
+              🟢 Finalizados
+            </button>
           </div>
         </div>
 
         <div id="adminChatListContainer">
           ${renderChatList()}
         </div>
+
       </main>
     </div>
   `;
@@ -3125,3 +3343,1214 @@ function checkChatNotifications() {
 if (!window.__chatPollInterval) {
   window.__chatPollInterval = setInterval(checkChatNotifications, 10000);
 }
+
+
+/* MACHADO_SUPPORT_UX_V3 */
+(function () {
+  "use strict";
+
+  // ============================================================
+  // ESTILO PROFISSIONAL DO ATENDIMENTO
+  // ============================================================
+  const style = document.createElement("style");
+  style.id = "machado-support-ux-v3";
+
+  style.textContent = `
+    /* ---------- pedidos ---------- */
+
+    .machado-support-order-area {
+      margin-top: 14px;
+      padding: 12px;
+      border: 1px solid rgba(34,211,238,.20);
+      border-radius: 14px;
+      background:
+        linear-gradient(
+          135deg,
+          rgba(6,182,212,.075),
+          rgba(2,132,199,.035)
+        );
+    }
+
+    .machado-support-order-label {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin-bottom:9px;
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.7px;
+      color:#67e8f9;
+      text-transform:uppercase;
+    }
+
+    .machado-support-order-label span:first-child {
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+
+    .machado-support-order-status {
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:10px;
+      letter-spacing:0;
+      text-transform:none;
+      white-space:nowrap;
+      background:rgba(255,255,255,.07);
+      color:#cbd5e1;
+      border:1px solid rgba(255,255,255,.08);
+    }
+
+    .machado-support-order-btn {
+      width:100% !important;
+      min-height:46px !important;
+      margin:0 !important;
+      border-radius:11px !important;
+      border:1px solid rgba(34,211,238,.65) !important;
+      background:
+        linear-gradient(
+          135deg,
+          rgba(6,182,212,.20),
+          rgba(2,132,199,.12)
+        ) !important;
+      color:#67e8f9 !important;
+      font-size:13px !important;
+      font-weight:900 !important;
+      letter-spacing:.15px;
+      box-shadow:0 0 18px rgba(6,182,212,.07);
+      transition:.18s ease;
+    }
+
+    .machado-support-order-btn:hover {
+      transform:translateY(-1px);
+      border-color:#22d3ee !important;
+      background:
+        linear-gradient(
+          135deg,
+          rgba(6,182,212,.28),
+          rgba(2,132,199,.18)
+        ) !important;
+    }
+
+    /* ---------- chat ---------- */
+
+    #order-support-modal {
+      backdrop-filter:blur(8px);
+    }
+
+    .machado-chat-window {
+      overflow:hidden;
+      border:1px solid rgba(34,211,238,.65);
+      box-shadow:
+        0 25px 80px rgba(0,0,0,.65),
+        0 0 35px rgba(6,182,212,.10);
+    }
+
+    .machado-chat-message {
+      max-width:min(78%, 520px);
+      margin:9px 0;
+      padding:11px 13px;
+      border-radius:15px;
+      line-height:1.42;
+      word-break:break-word;
+      box-sizing:border-box;
+    }
+
+    .machado-chat-message.admin {
+      margin-right:auto;
+      margin-left:0;
+      background:
+        linear-gradient(
+          135deg,
+          rgba(8,47,73,.95),
+          rgba(6,78,92,.78)
+        );
+      border:1px solid rgba(34,211,238,.42);
+      border-bottom-left-radius:5px;
+    }
+
+    .machado-chat-message.customer {
+      margin-left:auto;
+      margin-right:0;
+      background:
+        linear-gradient(
+          135deg,
+          rgba(3,105,161,.95),
+          rgba(8,47,73,.90)
+        );
+      border:1px solid rgba(56,189,248,.48);
+      border-bottom-right-radius:5px;
+    }
+
+    .machado-chat-message .sender {
+      display:flex;
+      align-items:center;
+      gap:6px;
+      margin-bottom:5px;
+      font-size:11px;
+      font-weight:900;
+    }
+
+    .machado-chat-message.admin .sender {
+      color:#67e8f9;
+    }
+
+    .machado-chat-message.customer .sender {
+      color:#bae6fd;
+      justify-content:flex-end;
+    }
+
+    .machado-chat-message .body {
+      color:#f8fafc;
+      font-size:14px;
+      white-space:pre-wrap;
+    }
+
+    .machado-chat-message .time {
+      margin-top:6px;
+      font-size:10px;
+      color:#94a3b8;
+    }
+
+    .machado-chat-message.customer .time {
+      text-align:right;
+    }
+
+    .machado-chat-legend {
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-top:7px;
+      font-size:10px;
+      color:#94a3b8;
+    }
+
+    .machado-chat-legend span {
+      display:inline-flex;
+      align-items:center;
+      gap:5px;
+      padding:4px 7px;
+      border-radius:999px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.07);
+    }
+
+    /* ---------- badges ---------- */
+
+    .machado-support-badge {
+      display:inline-flex !important;
+      align-items:center;
+      justify-content:center;
+      min-width:17px;
+      height:17px;
+      padding:0 5px;
+      margin-left:5px;
+      border-radius:999px;
+      background:#ef4444;
+      color:#fff !important;
+      font-size:10px;
+      font-weight:900;
+      line-height:17px;
+      box-shadow:0 0 10px rgba(239,68,68,.40);
+      vertical-align:middle;
+    }
+
+    .machado-support-toast {
+      position:fixed;
+      right:18px;
+      bottom:88px;
+      z-index:2147483000;
+      width:min(360px,calc(100vw - 36px));
+      padding:14px;
+      border:1px solid rgba(34,211,238,.55);
+      border-radius:16px;
+      background:
+        linear-gradient(
+          145deg,
+          rgba(8,15,30,.98),
+          rgba(3,12,24,.98)
+        );
+      color:#fff;
+      box-shadow:
+        0 20px 55px rgba(0,0,0,.55),
+        0 0 25px rgba(6,182,212,.14);
+      animation:machadoSupportToastIn .22s ease;
+    }
+
+    .machado-support-toast-title {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      color:#67e8f9;
+      font-weight:900;
+      font-size:14px;
+    }
+
+    .machado-support-toast-text {
+      margin-top:5px;
+      color:#cbd5e1;
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    .machado-support-toast button {
+      width:100%;
+      margin-top:10px;
+      padding:9px 12px;
+      border:0;
+      border-radius:9px;
+      background:#06b6d4;
+      color:#031018;
+      font-weight:900;
+      cursor:pointer;
+    }
+
+    @keyframes machadoSupportToastIn {
+      from {
+        opacity:0;
+        transform:translateY(12px);
+      }
+      to {
+        opacity:1;
+        transform:translateY(0);
+      }
+    }
+
+    /* ---------- mobile ---------- */
+
+    @media(max-width:600px) {
+      .machado-chat-message {
+        max-width:88%;
+      }
+
+      .machado-support-toast {
+        right:10px;
+        bottom:75px;
+        width:calc(100vw - 20px);
+      }
+    }
+  `;
+
+  if (!document.getElementById(style.id)) {
+    document.head.appendChild(style);
+  }
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+  const esc = (value) => {
+    const div = document.createElement("div");
+    div.textContent = value == null ? "" : String(value);
+    return div.innerHTML;
+  };
+
+  const formatTime = (value) => {
+    try {
+      return new Date(value).toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    } catch {
+      return "";
+    }
+  };
+
+  const statusInfo = (status) => {
+    switch (status) {
+      case "novo":
+        return {
+          icon: "🆕",
+          label: "Novo",
+          color: "#38bdf8"
+        };
+
+      case "andamento":
+        return {
+          icon: "🔵",
+          label: "Em andamento",
+          color: "#60a5fa"
+        };
+
+      case "aguardando_cliente":
+        return {
+          icon: "🟡",
+          label: "Aguardando cliente",
+          color: "#facc15"
+        };
+
+      case "finalizado":
+        return {
+          icon: "🟢",
+          label: "Finalizado",
+          color: "#84cc16"
+        };
+
+      default:
+        return {
+          icon: "💬",
+          label: "Atendimento",
+          color: "#22d3ee"
+        };
+    }
+  };
+
+  const showSupportToast = (title, message, orderId) => {
+    const old = document.querySelector(".machado-support-toast");
+    if (old) old.remove();
+
+    const toast = document.createElement("div");
+    toast.className = "machado-support-toast";
+
+    toast.innerHTML = `
+      <div class="machado-support-toast-title">
+        💬 ${esc(title)}
+      </div>
+      <div class="machado-support-toast-text">
+        ${esc(message)}
+      </div>
+      ${
+        orderId
+          ? `<button type="button" data-open-support="${Number(orderId)}">
+               Abrir atendimento
+             </button>`
+          : ""
+      }
+    `;
+
+    document.body.appendChild(toast);
+
+    const btn = toast.querySelector("[data-open-support]");
+    if (btn) {
+      btn.addEventListener("click", () => {
+        const id = Number(btn.dataset.openSupport);
+        toast.remove();
+        window.openOrderChatModal(id);
+      });
+    }
+
+    setTimeout(() => {
+      if (toast.isConnected) toast.remove();
+    }, 9000);
+  };
+
+  // ============================================================
+  // BADGE DE NÃO LIDAS
+  // ============================================================
+  function updateSupportBadges(total) {
+    document
+      .querySelectorAll(
+        'a[href="#/admin/suporte"],a[href="#/conta/suporte"]'
+      )
+      .forEach((link) => {
+        let badge = link.querySelector(".machado-support-badge");
+
+        if (total > 0) {
+          if (!badge) {
+            badge = document.createElement("span");
+            badge.className = "machado-support-badge";
+            link.appendChild(badge);
+          }
+
+          badge.textContent = total > 99 ? "99+" : String(total);
+        } else if (badge) {
+          badge.remove();
+        }
+      });
+  }
+
+  // ============================================================
+  // NOTIFICAÇÕES ROBUSTAS
+  //
+  // Usa unread_admin/unread_customer.
+  // Não depende de quantidade de conversas nem last_sender.
+  // ============================================================
+  let supportNotificationReady = false;
+  let lastUnreadSupport = null;
+  let supportPolling = false;
+
+  async function getSupportChatsForNotification() {
+    try {
+      const sessionRes = await fetch("/api/auth/session", {
+        credentials: "same-origin"
+      });
+
+      if (!sessionRes.ok) return null;
+
+      const session = await sessionRes.json();
+
+      if (!session.authenticated || !session.user) {
+        updateSupportBadges(0);
+        return null;
+      }
+
+      const rolesAdmin = [
+        "admin",
+        "super_admin",
+        "owner"
+      ];
+
+      const isAdmin = rolesAdmin.includes(
+        String(session.user.role || "").toLowerCase()
+      );
+
+      const endpoint = isAdmin
+        ? "/api/admin/support/chats"
+        : "/api/me/support/chats";
+
+      const res = await fetch(endpoint, {
+        credentials: "same-origin",
+        cache: "no-store"
+      });
+
+      if (!res.ok) return null;
+
+      const chats = await res.json();
+
+      if (!Array.isArray(chats)) return null;
+
+      return { chats, isAdmin };
+    } catch {
+      return null;
+    }
+  }
+
+  async function checkSupportNotificationsV3(force = false) {
+    if (supportPolling) return;
+    supportPolling = true;
+
+    try {
+      const result = await getSupportChatsForNotification();
+
+      if (!result) return;
+
+      const { chats, isAdmin } = result;
+
+      const unreadField = isAdmin
+        ? "unread_admin"
+        : "unread_customer";
+
+      const unreadChats = chats
+        .filter(c => Number(c[unreadField] || 0) > 0)
+        .sort(
+          (a, b) =>
+            new Date(b.updated_at || b.support_updated_at || b.last_message_at || 0) -
+            new Date(a.updated_at || a.support_updated_at || a.last_message_at || 0)
+        );
+
+      const unreadTotal = unreadChats.reduce(
+        (sum, c) => sum + Number(c[unreadField] || 0),
+        0
+      );
+
+      updateSupportBadges(unreadTotal);
+
+      const signature = unreadChats
+        .map(
+          c =>
+            `${c.id}:${Number(c[unreadField] || 0)}:${c.last_message_at || ""}`
+        )
+        .join("|");
+
+      if (!supportNotificationReady) {
+        lastUnreadSupport = signature;
+        supportNotificationReady = true;
+        return;
+      }
+
+      if (!force && signature === lastUnreadSupport) {
+        return;
+      }
+
+      const previous = lastUnreadSupport;
+      lastUnreadSupport = signature;
+
+      if (!previous && unreadTotal === 0) {
+        return;
+      }
+
+      if (unreadTotal <= 0) return;
+
+      const newest = unreadChats[0];
+
+      if (!newest) return;
+
+      const customerName =
+        newest.customer_name || "Cliente";
+
+      const orderId = Number(newest.id);
+
+      const title = isAdmin
+        ? "Nova mensagem no atendimento"
+        : "O atendimento respondeu";
+
+      const textMessage = isAdmin
+        ? `${customerName} enviou uma nova mensagem sobre o Pedido #${orderId}.`
+        : `A equipe respondeu sobre o Pedido #${orderId}.`;
+
+      showSupportToast(
+        title,
+        textMessage,
+        orderId
+      );
+
+      if (
+        typeof navigator !== "undefined" &&
+        "vibrate" in navigator
+      ) {
+        try {
+          navigator.vibrate([100, 60, 100]);
+        } catch {}
+      }
+
+      // Notificação nativa, quando já autorizada.
+      if (
+        typeof Notification !== "undefined" &&
+        Notification.permission === "granted"
+      ) {
+        try {
+          const notification = new Notification(title, {
+            body: textMessage,
+            tag: `machado-support-${orderId}`,
+            renotify: true
+          });
+
+          notification.onclick = () => {
+            window.focus();
+            window.openOrderChatModal(orderId);
+            notification.close();
+          };
+        } catch {}
+      }
+    } finally {
+      supportPolling = false;
+    }
+  }
+
+  window.checkSupportNotificationsV3 =
+    checkSupportNotificationsV3;
+
+  // Mata o polling antigo, que estava baseado em last_sender.
+  if (window.__chatPollInterval) {
+    clearInterval(window.__chatPollInterval);
+  }
+
+  window.__chatPollIntervalV3 = setInterval(
+    () => checkSupportNotificationsV3(false),
+    5000
+  );
+
+  checkSupportNotificationsV3(true);
+
+  document.addEventListener(
+    "visibilitychange",
+    () => {
+      if (!document.hidden) {
+        checkSupportNotificationsV3(true);
+      }
+    },
+    { passive: true }
+  );
+
+  // ============================================================
+  // CHAT — CLIENTE x ATENDENTE
+  // ============================================================
+  window.openOrderChatModal = async function(orderId) {
+    orderId = Number(orderId);
+
+    if (!orderId) return;
+
+    const old = document.getElementById("order-support-modal");
+    if (old) old.remove();
+
+    const modal = document.createElement("div");
+
+    modal.id = "order-support-modal";
+
+    modal.style.cssText = `
+      position:fixed;
+      inset:0;
+      z-index:2147482000;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:16px;
+      background:rgba(0,0,0,.76);
+    `;
+
+    modal.innerHTML = `
+      <div
+        class="machado-chat-window"
+        style="
+          width:min(760px,100%);
+          height:min(760px,calc(100vh - 32px));
+          display:flex;
+          flex-direction:column;
+          border-radius:22px;
+          background:#050a12;
+          color:#fff;
+        "
+      >
+
+        <div
+          style="
+            padding:16px 18px;
+            background:
+              linear-gradient(
+                135deg,
+                rgba(15,23,42,.98),
+                rgba(8,47,73,.96)
+              );
+            border-bottom:1px solid rgba(34,211,238,.20);
+          "
+        >
+          <div
+            style="
+              display:flex;
+              align-items:center;
+              justify-content:space-between;
+              gap:12px;
+            "
+          >
+            <div>
+              <div
+                style="
+                  color:#fff;
+                  font-size:18px;
+                  font-weight:900;
+                "
+              >
+                💬 Atendimento · Pedido #${orderId}
+              </div>
+
+              <div
+                id="machadoChatSubtitle"
+                style="
+                  margin-top:4px;
+                  color:#67e8f9;
+                  font-size:12px;
+                  font-weight:800;
+                "
+              >
+                Atendimento Machado Express
+              </div>
+            </div>
+
+            <button
+              type="button"
+              id="machadoChatClose"
+              style="
+                width:38px;
+                height:38px;
+                border:0;
+                border-radius:50%;
+                background:rgba(255,255,255,.08);
+                color:#cbd5e1;
+                font-size:20px;
+                cursor:pointer;
+              "
+            >
+              ×
+            </button>
+          </div>
+
+          <div class="machado-chat-legend">
+            <span>🛠️ Atendimento</span>
+            <span>👤 Cliente</span>
+          </div>
+        </div>
+
+        <div
+          id="machadoChatMessages"
+          style="
+            flex:1;
+            min-height:0;
+            overflow-y:auto;
+            padding:16px;
+            background:
+              radial-gradient(
+                circle at top,
+                rgba(6,182,212,.045),
+                transparent 45%
+              );
+          "
+        >
+          <div
+            style="
+              height:100%;
+              display:flex;
+              align-items:center;
+              justify-content:center;
+              color:#64748b;
+              font-size:13px;
+            "
+          >
+            Carregando conversa...
+          </div>
+        </div>
+
+        <form
+          id="machadoChatForm"
+          style="
+            display:flex;
+            gap:9px;
+            padding:12px;
+            background:#0b1220;
+            border-top:1px solid rgba(255,255,255,.08);
+          "
+        >
+          <textarea
+            id="machadoChatInput"
+            rows="2"
+            maxlength="2000"
+            placeholder="Digite sua mensagem..."
+            style="
+              flex:1;
+              resize:none;
+              box-sizing:border-box;
+              border:1px solid rgba(34,211,238,.45);
+              border-radius:12px;
+              background:#050a12;
+              color:#fff;
+              outline:none;
+              padding:12px;
+              font-size:13px;
+              font-family:inherit;
+            "
+          ></textarea>
+
+          <button
+            type="submit"
+            id="machadoChatSend"
+            style="
+              align-self:stretch;
+              min-width:92px;
+              border:0;
+              border-radius:12px;
+              background:
+                linear-gradient(
+                  135deg,
+                  #06b6d4,
+                  #0284c7
+                );
+              color:#031018;
+              font-weight:900;
+              cursor:pointer;
+            "
+          >
+            Enviar
+          </button>
+        </form>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = () => modal.remove();
+
+    modal.querySelector("#machadoChatClose")
+      .addEventListener("click", close);
+
+    modal.addEventListener("click", e => {
+      if (e.target === modal) close();
+    });
+
+    const messagesEl =
+      modal.querySelector("#machadoChatMessages");
+
+    const input =
+      modal.querySelector("#machadoChatInput");
+
+    const sendBtn =
+      modal.querySelector("#machadoChatSend");
+
+    let session = null;
+
+    try {
+      const sessionRes = await fetch(
+        "/api/auth/session",
+        {
+          credentials:"same-origin",
+          cache:"no-store"
+        }
+      );
+
+      if (sessionRes.ok) {
+        session = await sessionRes.json();
+      }
+    } catch {}
+
+    const isAdmin = !!(
+      session &&
+      session.authenticated &&
+      [
+        "admin",
+        "super_admin",
+        "owner"
+      ].includes(
+        String(session.user?.role || "").toLowerCase()
+      )
+    );
+
+    if (isAdmin) {
+      input.placeholder =
+        "Responder ao cliente...";
+    } else {
+      input.placeholder =
+        "Digite sua dúvida para o atendimento...";
+    }
+
+    async function markRead() {
+      try {
+        await fetch(
+          `/api/orders/${orderId}/messages/read`,
+          {
+            method:"POST",
+            credentials:"same-origin"
+          }
+        );
+      } catch {}
+    }
+
+    async function loadMessages() {
+      try {
+        const res = await fetch(
+          `/api/orders/${orderId}/messages`,
+          {
+            credentials:"same-origin",
+            cache:"no-store"
+          }
+        );
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(
+            data.error || "Não foi possível carregar o atendimento."
+          );
+        }
+
+        const messages = Array.isArray(data)
+          ? data
+          : Array.isArray(data.messages)
+            ? data.messages
+            : [];
+
+        if (!messages.length) {
+          messagesEl.innerHTML = `
+            <div
+              style="
+                height:100%;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                text-align:center;
+                color:#64748b;
+                font-size:13px;
+                padding:30px;
+              "
+            >
+              <div>
+                <div style="font-size:32px;margin-bottom:8px;">
+                  💬
+                </div>
+                Nenhuma mensagem ainda.<br>
+                Envie sua dúvida e o atendimento responderá aqui.
+              </div>
+            </div>
+          `;
+        } else {
+          messagesEl.innerHTML = messages
+            .map(m => {
+              const role =
+                String(m.sender_role || "").toLowerCase();
+
+              const customer = role === "customer";
+
+              const bubbleClass =
+                customer
+                  ? "customer"
+                  : "admin";
+
+              const senderName =
+                m.sender_name ||
+                (customer ? "Cliente" : "Atendimento");
+
+              const senderLabel =
+                customer
+                  ? (
+                      isAdmin
+                        ? `👤 Cliente · ${senderName}`
+                        : "👤 Você"
+                    )
+                  : `🛠️ Atendimento · ${senderName}`;
+
+              return `
+                <div class="machado-chat-message ${bubbleClass}">
+                  <div class="sender">
+                    ${esc(senderLabel)}
+                  </div>
+
+                  <div class="body">
+                    ${esc(m.message || "")}
+                  </div>
+
+                  <div class="time">
+                    ${esc(formatTime(m.created_at))}
+                  </div>
+                </div>
+              `;
+            })
+            .join("");
+        }
+
+        messagesEl.scrollTop =
+          messagesEl.scrollHeight;
+
+        await markRead();
+        checkSupportNotificationsV3(true);
+      } catch (err) {
+        messagesEl.innerHTML = `
+          <div
+            style="
+              padding:20px;
+              color:#fca5a5;
+              text-align:center;
+              font-size:13px;
+            "
+          >
+            Não foi possível carregar o atendimento.<br>
+            ${esc(err.message || "Erro desconhecido.")}
+          </div>
+        `;
+      }
+    }
+
+    modal.querySelector("#machadoChatForm")
+      .addEventListener("submit", async e => {
+        e.preventDefault();
+
+        const message =
+          String(input.value || "").trim();
+
+        if (!message) return;
+
+        sendBtn.disabled = true;
+        sendBtn.textContent = "Enviando...";
+
+        try {
+          const res = await fetch(
+            `/api/orders/${orderId}/messages`,
+            {
+              method:"POST",
+              credentials:"same-origin",
+              headers:{
+                "Content-Type":"application/json"
+              },
+              body:JSON.stringify({ message })
+            }
+          );
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            throw new Error(
+              data.error || "Não foi possível enviar."
+            );
+          }
+
+          input.value = "";
+
+          await loadMessages();
+        } catch (err) {
+          showSupportToast(
+            "Erro no atendimento",
+            err.message || "Não foi possível enviar a mensagem.",
+            orderId
+          );
+        } finally {
+          sendBtn.disabled = false;
+          sendBtn.textContent = "Enviar";
+          input.focus();
+        }
+      });
+
+    await loadMessages();
+
+    let chatRefreshTimer = setInterval(() => {
+      if (
+        document.body.contains(modal) &&
+        !document.hidden
+      ) {
+        loadMessages(true);
+      } else if (!document.body.contains(modal)) {
+        clearInterval(chatRefreshTimer);
+        chatRefreshTimer = null;
+      }
+    }, 5000);
+
+    const stopChatRefresh = () => {
+      if (chatRefreshTimer) {
+        clearInterval(chatRefreshTimer);
+        chatRefreshTimer = null;
+      }
+    };
+
+    modal.querySelector("#machadoChatClose")
+      .addEventListener("click", stopChatRefresh);
+
+    modal.addEventListener("click", e => {
+      if (e.target === modal) {
+        stopChatRefresh();
+      }
+    });
+
+    setTimeout(() => input.focus(), 100);
+  };
+
+  // ============================================================
+  // MELHORA OS BOTÕES "SUPORTE DO PEDIDO" NA CONTA
+  // ============================================================
+  let accountSupportEnhancing = false;
+
+  async function enhanceAccountSupport() {
+    if (accountSupportEnhancing) return;
+
+    accountSupportEnhancing = true;
+
+    try {
+      const buttons = Array.from(
+        document.querySelectorAll("button")
+      ).filter(btn =>
+        /Suporte do Pedido/i.test(
+          btn.textContent || ""
+        )
+      );
+
+      if (!buttons.length) return;
+
+      let chats = [];
+
+      try {
+        const res = await fetch(
+          "/api/me/support/chats",
+          {
+            credentials:"same-origin",
+            cache:"no-store"
+          }
+        );
+
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) chats = data;
+        }
+      } catch {}
+
+      const byOrder = new Map(
+        chats.map(c => [Number(c.id), c])
+      );
+
+      for (const btn of buttons) {
+        if (
+          btn.classList.contains(
+            "machado-support-order-btn"
+          )
+        ) continue;
+
+        const onclick =
+          btn.getAttribute("onclick") || "";
+
+        const match =
+          onclick.match(
+            /openOrderChatModal\\((\\d+)\\)/
+          );
+
+        const orderId =
+          match ? Number(match[1]) : null;
+
+        btn.classList.add(
+          "machado-support-order-btn"
+        );
+
+        btn.textContent =
+          "💬 Falar com o Atendimento";
+
+        const area =
+          document.createElement("div");
+
+        area.className =
+          "machado-support-order-area";
+
+        const ticket =
+          orderId ? byOrder.get(orderId) : null;
+
+        const info =
+          statusInfo(
+            ticket?.support_status || "novo"
+          );
+
+        area.innerHTML = `
+          <div class="machado-support-order-label">
+            <span>🎧 Atendimento do pedido</span>
+            ${
+              ticket
+                ? `<span
+                     class="machado-support-order-status"
+                     style="
+                       color:${info.color};
+                       border-color:${info.color}55;
+                     "
+                   >
+                     ${info.icon} ${esc(info.label)}
+                   </span>`
+                : `<span
+                     class="machado-support-order-status"
+                   >
+                     💬 Disponível
+                   </span>`
+            }
+          </div>
+        `;
+
+        const parent = btn.parentElement;
+
+        if (parent) {
+          parent.insertBefore(area, btn);
+          area.appendChild(btn);
+        }
+      }
+    } finally {
+      accountSupportEnhancing = false;
+    }
+  }
+
+  // Executa depois da renderização atual.
+  setTimeout(enhanceAccountSupport, 250);
+  setTimeout(enhanceAccountSupport, 1000);
+  setTimeout(enhanceAccountSupport, 2500);
+
+  // Observa trocas de rota/renderização.
+  if (!window.__machadoSupportObserverV3) {
+    window.__machadoSupportObserverV3 =
+      new MutationObserver(() => {
+        clearTimeout(
+          window.__machadoSupportEnhanceTimerV3
+        );
+
+        window.__machadoSupportEnhanceTimerV3 =
+          setTimeout(
+            enhanceAccountSupport,
+            250
+          );
+      });
+
+    window.__machadoSupportObserverV3.observe(
+      document.body,
+      {
+        childList:true,
+        subtree:true
+      }
+    );
+  }
+
+})();

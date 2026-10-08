@@ -203,6 +203,37 @@ CREATE TABLE IF NOT EXISTS order_messages (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 )`);
 
+db.exec(`
+CREATE TABLE IF NOT EXISTS support_tickets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id INTEGER NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'novo',
+  unread_admin INTEGER NOT NULL DEFAULT 0,
+  unread_customer INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  closed_at TEXT DEFAULT NULL,
+  FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE
+)`);
+
+// Migrações seguras para instalações existentes.
+try {
+  db.exec("ALTER TABLE support_tickets ADD COLUMN unread_admin INTEGER NOT NULL DEFAULT 0;");
+} catch(e) {}
+
+try {
+  db.exec("ALTER TABLE support_tickets ADD COLUMN unread_customer INTEGER NOT NULL DEFAULT 0;");
+} catch(e) {}
+
+try {
+  db.exec("ALTER TABLE support_tickets ADD COLUMN updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP;");
+} catch(e) {}
+
+try {
+  db.exec("ALTER TABLE support_tickets ADD COLUMN closed_at TEXT DEFAULT NULL;");
+} catch(e) {}
+
+
 
 // PERSISTENCIA DE CONFIGURACOES EM ARQUIVO
 const SETTINGS_FILE = path.join(__dirname, "data", "settings.json");
@@ -998,62 +1029,508 @@ app.post("/api/orders/:id/messages", auth, (req, res) => {
     const u = currentUser(req);
     const orderId = Number(req.params.id);
     const msg = (req.body.message || "").trim();
-    if (!msg) return res.status(400).json({ error: "Mensagem vazia." });
+
+    if (!msg) {
+      return res.status(400).json({ error: "Mensagem vazia." });
+    }
+
     const order = db.prepare("SELECT * FROM orders WHERE id=?").get(orderId);
-    if (!order) return res.status(404).json({ error: "Pedido não encontrado." });
+
+    if (!order) {
+      return res.status(404).json({ error: "Pedido não encontrado." });
+    }
+
     const isAdmin = ADMIN_ROLES.has(u.role);
-    if (!isAdmin && order.user_id !== u.id) return res.status(403).json({ error: "Acesso negado." });
+
+    if (!isAdmin && order.user_id !== u.id) {
+      return res.status(403).json({ error: "Acesso negado." });
+    }
+
     const role = isAdmin ? "admin" : "customer";
     const name = u.name || (isAdmin ? "Suporte" : "Cliente");
-    const ins = db.prepare("INSERT INTO order_messages (order_id, sender_role, sender_name, message) VALUES (?, ?, ?, ?)").run(orderId, role, name, msg);
-    
+
+    const ins = db.prepare(`
+      INSERT INTO order_messages
+        (order_id, sender_role, sender_name, message)
+      VALUES (?, ?, ?, ?)
+    `).run(orderId, role, name, msg);
+
+    const now = new Date().toISOString();
+
+    if (isAdmin) {
+      // Admin respondeu: cliente precisa ser avisado.
+      db.prepare(`
+        INSERT INTO support_tickets
+          (order_id, status, unread_admin, unread_customer, updated_at, closed_at)
+        VALUES (?, 'aguardando_cliente', 0, 1, ?, NULL)
+        ON CONFLICT(order_id) DO UPDATE SET
+          status='aguardando_cliente',
+          unread_customer=support_tickets.unread_customer + 1,
+          updated_at=excluded.updated_at,
+          closed_at=NULL
+      `).run(orderId, now);
+    } else {
+      // Cliente respondeu: suporte precisa ser avisado.
+      db.prepare(`
+        INSERT INTO support_tickets
+          (order_id, status, unread_admin, unread_customer, updated_at, closed_at)
+        VALUES (?, 'novo', 1, 0, ?, NULL)
+        ON CONFLICT(order_id) DO UPDATE SET
+          status='novo',
+          unread_admin=support_tickets.unread_admin + 1,
+          updated_at=excluded.updated_at,
+          closed_at=NULL
+      `).run(orderId, now);
+    }
+
     if (typeof schedulePgSync === 'function') {
       schedulePgSync();
     }
-    
-    res.json({ ok: true, id: ins.lastInsertRowid });
+
+    res.json({
+      ok: true,
+      id: ins.lastInsertRowid
+    });
   } catch(e) {
+    console.error("[SUPORTE] erro ao enviar mensagem:", e);
     res.status(500).json({ error: e.message });
   }
 });
 
 app.get("/api/admin/support/chats", admin, (req, res) => {
   try {
+    // Garante tickets para conversas antigas.
+    db.exec(`
+      INSERT OR IGNORE INTO support_tickets
+        (order_id, status, unread_admin, unread_customer, updated_at)
+      SELECT
+        om.order_id,
+        'novo',
+        0,
+        0,
+        MAX(om.created_at)
+      FROM order_messages om
+      GROUP BY om.order_id
+    `);
+
     const list = db.prepare(`
-      SELECT o.id, o.customer_name, o.customer_phone, o.total, o.status,
-             (SELECT message FROM order_messages WHERE order_id=o.id ORDER BY id DESC LIMIT 1) as last_message,
-             (SELECT sender_role FROM order_messages WHERE order_id=o.id ORDER BY id DESC LIMIT 1) as last_sender,
-             (SELECT created_at FROM order_messages WHERE order_id=o.id ORDER BY id DESC LIMIT 1) as last_message_at,
-             COUNT(m.id) as message_count
+      SELECT
+        o.id,
+        u.name AS customer_name,
+        u.phone AS customer_phone,
+        o.total,
+
+        o.status AS order_status,
+
+        st.status AS support_status,
+        st.unread_admin,
+        st.unread_customer,
+        st.created_at AS support_created_at,
+        st.updated_at AS support_updated_at,
+        st.closed_at AS support_closed_at,
+
+        (
+          SELECT message
+          FROM order_messages
+          WHERE order_id=o.id
+          ORDER BY id DESC
+          LIMIT 1
+        ) AS last_message,
+
+        (
+          SELECT sender_role
+          FROM order_messages
+          WHERE order_id=o.id
+          ORDER BY id DESC
+          LIMIT 1
+        ) AS last_sender,
+
+        (
+          SELECT created_at
+          FROM order_messages
+          WHERE order_id=o.id
+          ORDER BY id DESC
+          LIMIT 1
+        ) AS last_message_at,
+
+        COUNT(m.id) AS message_count
+
       FROM orders o
-      JOIN order_messages m ON m.order_id = o.id
+      JOIN users u ON u.id=o.user_id
+      JOIN order_messages m ON m.order_id=o.id
+      JOIN support_tickets st ON st.order_id=o.id
+
       GROUP BY o.id
-      ORDER BY last_message_at DESC
+
+      ORDER BY COALESCE(st.updated_at, last_message_at) DESC
     `).all();
+
     res.json(list);
   } catch(e) {
-    res.json([]);
+    console.error("[SUPORTE ADMIN] erro:", e);
+    res.status(500).json({
+      error: e.message,
+      data: []
+    });
   }
 });
 
 app.get("/api/me/support/chats", auth, (req, res) => {
   try {
     const u = currentUser(req);
+
+    // Garante tickets para conversas antigas.
+    db.exec(`
+      INSERT OR IGNORE INTO support_tickets
+        (order_id, status, unread_admin, unread_customer, updated_at)
+      SELECT
+        om.order_id,
+        'novo',
+        0,
+        0,
+        MAX(om.created_at)
+      FROM order_messages om
+      GROUP BY om.order_id
+    `);
+
     const list = db.prepare(`
-      SELECT o.id, o.customer_name, o.customer_phone, o.total, o.status,
-             (SELECT message FROM order_messages WHERE order_id=o.id ORDER BY id DESC LIMIT 1) as last_message,
-             (SELECT sender_role FROM order_messages WHERE order_id=o.id ORDER BY id DESC LIMIT 1) as last_sender,
-             (SELECT created_at FROM order_messages WHERE order_id=o.id ORDER BY id DESC LIMIT 1) as last_message_at,
-             COUNT(m.id) as message_count
+      SELECT
+        o.id,
+        u.name AS customer_name,
+        u.phone AS customer_phone,
+        o.total,
+
+        o.status AS order_status,
+
+        st.status AS support_status,
+        st.unread_admin,
+        st.unread_customer,
+        st.created_at AS support_created_at,
+        st.updated_at AS support_updated_at,
+        st.closed_at AS support_closed_at,
+
+        (
+          SELECT message
+          FROM order_messages
+          WHERE order_id=o.id
+          ORDER BY id DESC
+          LIMIT 1
+        ) AS last_message,
+
+        (
+          SELECT sender_role
+          FROM order_messages
+          WHERE order_id=o.id
+          ORDER BY id DESC
+          LIMIT 1
+        ) AS last_sender,
+
+        (
+          SELECT created_at
+          FROM order_messages
+          WHERE order_id=o.id
+          ORDER BY id DESC
+          LIMIT 1
+        ) AS last_message_at,
+
+        COUNT(m.id) AS message_count
+
       FROM orders o
-      JOIN order_messages m ON m.order_id = o.id
-      WHERE o.user_id = ?
+      JOIN users u ON u.id=o.user_id
+      JOIN order_messages m ON m.order_id=o.id
+      JOIN support_tickets st ON st.order_id=o.id
+
+      WHERE o.user_id=?
+
       GROUP BY o.id
-      ORDER BY last_message_at DESC
+
+      ORDER BY COALESCE(st.updated_at, last_message_at) DESC
     `).all(u.id);
+
     res.json(list);
   } catch(e) {
-    res.json([]);
+    console.error("[SUPORTE CLIENTE] erro:", e);
+    res.status(500).json({
+      error: e.message,
+      data: []
+    });
+  }
+});
+
+// ============================================================
+// CENTRAL DE SUPORTE - STATUS E NOTIFICAÇÕES
+// ============================================================
+
+app.get("/api/admin/support/summary", admin, (req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT
+        status,
+        COUNT(*) AS total,
+        COALESCE(SUM(unread_admin), 0) AS unread_admin,
+        COALESCE(SUM(unread_customer), 0) AS unread_customer
+      FROM support_tickets
+      GROUP BY status
+    `).all();
+
+    const summary = {
+      novo: 0,
+      andamento: 0,
+      aguardando_cliente: 0,
+      finalizado: 0,
+      unread_admin: 0,
+      unread_customer: 0
+    };
+
+    for (const row of rows) {
+      const status = row.status;
+
+      if (Object.prototype.hasOwnProperty.call(summary, status)) {
+        summary[status] = Number(row.total || 0);
+      }
+
+      summary.unread_admin += Number(row.unread_admin || 0);
+      summary.unread_customer += Number(row.unread_customer || 0);
+    }
+
+    res.json({
+      ok: true,
+      ...summary
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/me/support/summary", auth, (req, res) => {
+  try {
+    const u = currentUser(req);
+
+    const row = db.prepare(`
+      SELECT
+        COUNT(*) AS total,
+        COALESCE(
+          SUM(CASE WHEN st.status != 'finalizado' THEN 1 ELSE 0 END),
+          0
+        ) AS active,
+        COALESCE(SUM(st.unread_customer), 0) AS unread_customer
+      FROM support_tickets st
+      JOIN orders o ON o.id=st.order_id
+      WHERE o.user_id=?
+    `).get(u.id);
+
+    res.json({
+      ok: true,
+      total: Number(row?.total || 0),
+      active: Number(row?.active || 0),
+      unread_customer: Number(row?.unread_customer || 0)
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/admin/support/:orderId/assume", admin, (req, res) => {
+  try {
+    const orderId = Number(req.params.orderId);
+
+    const ticket = db.prepare(
+      "SELECT * FROM support_tickets WHERE order_id=?"
+    ).get(orderId);
+
+    if (!ticket) {
+      return res.status(404).json({
+        error: "Atendimento não encontrado."
+      });
+    }
+
+    db.prepare(`
+      UPDATE support_tickets
+      SET
+        status='andamento',
+        unread_admin=0,
+        updated_at=?,
+        closed_at=NULL
+      WHERE order_id=?
+    `).run(new Date().toISOString(), orderId);
+
+    schedulePgSync();
+
+    res.json({
+      ok: true,
+      status: "andamento"
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/admin/support/:orderId/finalize", admin, (req, res) => {
+  try {
+    const orderId = Number(req.params.orderId);
+
+    const ticket = db.prepare(
+      "SELECT * FROM support_tickets WHERE order_id=?"
+    ).get(orderId);
+
+    if (!ticket) {
+      return res.status(404).json({
+        error: "Atendimento não encontrado."
+      });
+    }
+
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      UPDATE support_tickets
+      SET
+        status='finalizado',
+        unread_admin=0,
+        unread_customer=0,
+        updated_at=?,
+        closed_at=?
+      WHERE order_id=?
+    `).run(now, now, orderId);
+
+    schedulePgSync();
+
+    res.json({
+      ok: true,
+      status: "finalizado"
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/admin/support/:orderId/reopen", admin, (req, res) => {
+  try {
+    const orderId = Number(req.params.orderId);
+
+    const ticket = db.prepare(
+      "SELECT * FROM support_tickets WHERE order_id=?"
+    ).get(orderId);
+
+    if (!ticket) {
+      return res.status(404).json({
+        error: "Atendimento não encontrado."
+      });
+    }
+
+    db.prepare(`
+      UPDATE support_tickets
+      SET
+        status='andamento',
+        updated_at=?,
+        closed_at=NULL
+      WHERE order_id=?
+    `).run(new Date().toISOString(), orderId);
+
+    schedulePgSync();
+
+    res.json({
+      ok: true,
+      status: "andamento"
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/me/support/:orderId/reopen", auth, (req, res) => {
+  try {
+    const u = currentUser(req);
+    const orderId = Number(req.params.orderId);
+
+    const order = db.prepare(
+      "SELECT * FROM orders WHERE id=?"
+    ).get(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        error: "Pedido não encontrado."
+      });
+    }
+
+    if (order.user_id !== u.id) {
+      return res.status(403).json({
+        error: "Acesso negado."
+      });
+    }
+
+    const ticket = db.prepare(
+      "SELECT * FROM support_tickets WHERE order_id=?"
+    ).get(orderId);
+
+    if (!ticket) {
+      return res.status(404).json({
+        error: "Atendimento não encontrado."
+      });
+    }
+
+    db.prepare(`
+      UPDATE support_tickets
+      SET
+        status='novo',
+        unread_admin=1,
+        updated_at=?,
+        closed_at=NULL
+      WHERE order_id=?
+    `).run(new Date().toISOString(), orderId);
+
+    schedulePgSync();
+
+    res.json({
+      ok: true,
+      status: "novo"
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/orders/:id/messages/read", auth, (req, res) => {
+  try {
+    const u = currentUser(req);
+    const orderId = Number(req.params.id);
+
+    const order = db.prepare(
+      "SELECT * FROM orders WHERE id=?"
+    ).get(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        error: "Pedido não encontrado."
+      });
+    }
+
+    const isAdmin = ADMIN_ROLES.has(u.role);
+
+    if (!isAdmin && order.user_id !== u.id) {
+      return res.status(403).json({
+        error: "Acesso negado."
+      });
+    }
+
+    if (isAdmin) {
+      db.prepare(`
+        UPDATE support_tickets
+        SET unread_admin=0
+        WHERE order_id=?
+      `).run(orderId);
+    } else {
+      db.prepare(`
+        UPDATE support_tickets
+        SET unread_customer=0
+        WHERE order_id=?
+      `).run(orderId);
+    }
+
+    schedulePgSync();
+
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
