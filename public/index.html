@@ -121,6 +121,120 @@ body.support-page #app img {
 }
 </style>
 
+
+<!-- MACHADOEXPRESS HOME VISUAL V3 -->
+<style id="machado-home-visual-v3">
+:root {
+  --mx-ink: #172033;
+  --mx-muted: #687386;
+  --mx-primary: #111827;
+  --mx-accent: #f59e0b;
+  --mx-surface: #ffffff;
+  --mx-page: #f5f7fb;
+  --mx-border: #e7ebf2;
+}
+body {
+  color: var(--mx-ink);
+}
+body:not(.admin-page) main,
+body:not(.admin-page) #app,
+body:not(.admin-page) .app,
+body:not(.admin-page) .page-content {
+  min-width: 0;
+}
+body:not(.admin-page) main {
+  padding-bottom: 32px;
+}
+body:not(.admin-page) .container,
+body:not(.admin-page) .content,
+body:not(.admin-page) .page-container {
+  width: min(1200px, 100%);
+  margin-inline: auto;
+}
+body:not(.admin-page) h1,
+body:not(.admin-page) h2,
+body:not(.admin-page) h3 {
+  letter-spacing: -.035em;
+  line-height: 1.18;
+}
+body:not(.admin-page) img {
+  max-width: 100%;
+}
+body:not(.admin-page) .product-card,
+body:not(.admin-page) .product-item,
+body:not(.admin-page) .produto-card,
+body:not(.admin-page) .product,
+body:not(.admin-page) .category-card,
+body:not(.admin-page) .category-item,
+body:not(.admin-page) .banner-card,
+body:not(.admin-page) .feature-card {
+  background: var(--mx-surface);
+  border: 1px solid var(--mx-border);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 5px 18px rgba(18, 30, 52, .055);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+body:not(.admin-page) .product-card:hover,
+body:not(.admin-page) .product-item:hover,
+body:not(.admin-page) .produto-card:hover,
+body:not(.admin-page) .category-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 26px rgba(18, 30, 52, .10);
+}
+body:not(.admin-page) button,
+body:not(.admin-page) .btn,
+body:not(.admin-page) a.button,
+body:not(.admin-page) input[type="submit"] {
+  transition: filter .15s ease, transform .15s ease;
+}
+body:not(.admin-page) button:active,
+body:not(.admin-page) .btn:active,
+body:not(.admin-page) a.button:active {
+  transform: scale(.98);
+}
+body:not(.admin-page) input,
+body:not(.admin-page) select,
+body:not(.admin-page) textarea {
+  max-width: 100%;
+  border-radius: 12px;
+}
+body:not(.admin-page) a {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  body:not(.admin-page) main {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  body:not(.admin-page) h1 {
+    font-size: clamp(1.65rem, 7vw, 2.2rem);
+  }
+  body:not(.admin-page) h2 {
+    font-size: clamp(1.25rem, 5vw, 1.65rem);
+  }
+  body:not(.admin-page) .product-card,
+  body:not(.admin-page) .product-item,
+  body:not(.admin-page) .produto-card,
+  body:not(.admin-page) .category-card {
+    border-radius: 14px;
+  }
+  body:not(.admin-page) button,
+  body:not(.admin-page) .btn {
+    min-height: 42px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body:not(.admin-page) *,
+  body:not(.admin-page) *::before,
+  body:not(.admin-page) *::after {
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+</style>
+<!-- /MACHADOEXPRESS HOME VISUAL V3 -->
+
 </head>
 <body>
 <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
