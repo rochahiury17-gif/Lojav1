@@ -2498,6 +2498,8 @@ async function adminSupport() {
     </div>
   `;
 
+  window.renderChatList = renderChatList;
+
   $('#app').innerHTML = `
     <div class="admin-shell">
       <aside class="admin-side">
@@ -2698,7 +2700,16 @@ window.renderAccount = async function(subTab = 'pedidos') {
     orders = [];
   }
 
-  const activeTab = location.hash.includes('perfil') ? 'perfil' : (location.hash.includes('endereco') ? 'endereco' : 'pedidos');
+  const activeTab = location.hash.includes('perfil') ? 'perfil' : (location.hash.includes('endereco') ? 'endereco' : (location.hash.includes('suporte') ? 'suporte' : 'pedidos'));
+  let myChats = [];
+  if (activeTab === 'suporte') {
+    try {
+      const chatRes = await api('/api/me/support/chats');
+      myChats = Array.isArray(chatRes) ? chatRes : [];
+    } catch(e) {
+      myChats = [];
+    }
+  }
 
   const ordersHtml = orders.length === 0 ? `
     <div style="text-align:center;padding:35px 20px;background:rgba(12,19,34,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:16px;color:#94a3b8;margin-top:14px;">
@@ -2742,12 +2753,34 @@ window.renderAccount = async function(subTab = 'pedidos') {
       <!-- ABAS DE NAVEGAÇÃO DA CONTA -->
       <div style="display:flex;gap:8px;margin-bottom:20px;background:rgba(12,19,34,0.8);padding:6px;border-radius:14px;border:1px solid rgba(255,255,255,0.08);">
         <button onclick="location.hash='#/conta/pedidos'" style="flex:1;background:${activeTab==='pedidos'?'linear-gradient(135deg,#06b6d4,#0284c7)':'transparent'};color:${activeTab==='pedidos'?'#041019':'#cbd5e1'};border:none;padding:10px;border-radius:10px;font-weight:800;font-size:12px;cursor:pointer;">📦 Meus Pedidos</button>
+        <button onclick="location.hash='#/conta/suporte'" style="flex:1;background:${activeTab==='suporte'?'linear-gradient(135deg,#06b6d4,#0284c7)':'transparent'};color:${activeTab==='suporte'?'#041019':'#cbd5e1'};border:none;padding:10px;border-radius:10px;font-weight:800;font-size:12px;cursor:pointer;">🎧 Atendimento</button>
         <button onclick="location.hash='#/conta/perfil'" style="flex:1;background:${activeTab==='perfil'?'linear-gradient(135deg,#06b6d4,#0284c7)':'transparent'};color:${activeTab==='perfil'?'#041019':'#cbd5e1'};border:none;padding:10px;border-radius:10px;font-weight:800;font-size:12px;cursor:pointer;">👤 Perfil</button>
         <button onclick="location.hash='#/conta/endereco'" style="flex:1;background:${activeTab==='endereco'?'linear-gradient(135deg,#06b6d4,#0284c7)':'transparent'};color:${activeTab==='endereco'?'#041019':'#cbd5e1'};border:none;padding:10px;border-radius:10px;font-weight:800;font-size:12px;cursor:pointer;">📍 Endereço</button>
       </div>
 
       <!-- CONTEÚDO DA ABA ATUAL -->
-      ${activeTab === 'pedidos' ? `
+      ${activeTab === 'suporte' ? `
+        <div>
+          <h3 style="font-size:16px;color:#fff;margin:0 0 12px;">🎧 Central de Atendimento</h3>
+          ${myChats.length === 0 ? `
+            <div style="text-align:center;padding:35px 20px;background:rgba(12,19,34,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:16px;color:#94a3b8;">
+              <span style="font-size:32px;display:block;margin-bottom:8px;">💬</span>
+              <h3 style="color:#fff;margin:0 0 6px;font-size:16px;">Nenhuma conversa de suporte</h3>
+              <p style="font-size:13px;margin:0 0 16px;">Abra o suporte dentro de um pedido para falar com a equipe.</p>
+              <a href="#/conta/pedidos" style="display:inline-block;background:linear-gradient(135deg,#06b6d4,#0284c7);color:#041019;padding:10px 20px;border-radius:10px;font-weight:800;font-size:13px;text-decoration:none;">Ver meus pedidos</a>
+            </div>
+          ` : myChats.map(c => `
+            <div style="background:linear-gradient(145deg,#0c1322 0%,#090e1a 100%);border:1px solid rgba(34,211,238,0.25);border-radius:14px;padding:14px;margin-bottom:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <b style="color:#fff;">Pedido #${esc(c.id)}</b>
+                <span style="font-size:11px;padding:3px 8px;border-radius:999px;background:${c.last_sender === 'admin' ? 'rgba(74,222,128,0.15);color:#4ade80' : 'rgba(251,191,36,0.15);color:#fbbf24'};font-weight:700;">${c.last_sender === 'admin' ? '✓ Respondido pela loja' : '⏳ Aguardando resposta'}</span>
+              </div>
+              <p style="font-size:12px;color:#94a3b8;margin:0 0 10px;">${esc(c.last_message || '')}</p>
+              <button type="button" onclick="openOrderChatModal(${Number(c.id)})" style="width:100%;background:linear-gradient(135deg,#06b6d4,#0284c7);color:#fff;border:none;padding:10px;border-radius:10px;font-weight:800;font-size:13px;cursor:pointer;">💬 Abrir Conversa</button>
+            </div>
+          `).join('')}
+        </div>
+      ` : activeTab === 'pedidos' ? `
         <div>
           <h3 style="font-size:16px;color:#fff;margin:0 0 12px;">Acompanhamento de Pedidos</h3>
           ${ordersHtml}
@@ -3052,3 +3085,38 @@ window.addCartById = async function(id, ev) {
     toast("Erro ao adicionar produto", "warn");
   }
 };
+
+
+let lastAdminChatCount = null;
+let lastCustomerChatReply = null;
+function checkChatNotifications() {
+  if (!store.user) return;
+  const isAdmin = ["super_admin","admin","gerente","atendente"].includes(store.user.role);
+  if (isAdmin) {
+    fetch('/api/admin/support/chats').then(r => r.json()).then(chats => {
+      if (!Array.isArray(chats)) return;
+      const unread = chats.filter(c => c.last_sender !== 'admin');
+      if (lastAdminChatCount !== null && unread.length > lastAdminChatCount) {
+        const newest = unread[0];
+        toast(`💬 Nova mensagem no Pedido #${newest.id}!`, 'ok');
+      }
+      lastAdminChatCount = unread.length;
+    }).catch(()=>{});
+  } else {
+    fetch('/api/me/support/chats').then(r => r.json()).then(chats => {
+      if (!Array.isArray(chats)) return;
+      const answered = chats.filter(c => c.last_sender === 'admin');
+      if (answered.length > 0) {
+        const top = answered[0];
+        const key = top.id + ':' + top.last_message_at;
+        if (lastCustomerChatReply !== null && lastCustomerChatReply !== key) {
+          toast(`💬 Resposta da loja no Pedido #${top.id}!`, 'ok');
+        }
+        lastCustomerChatReply = key;
+      }
+    }).catch(()=>{});
+  }
+}
+if (!window.__chatPollInterval) {
+  window.__chatPollInterval = setInterval(checkChatNotifications, 10000);
+}

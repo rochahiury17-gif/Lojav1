@@ -977,35 +977,44 @@ app.post("/api/admin/posts/remove-bg",manager,async(req,res)=>{
 });
 
 app.get("/api/admin/logs",admin,(req,res)=>res.json(db.prepare(`SELECT l.*,u.name user_name FROM audit_logs l LEFT JOIN users u ON u.id=l.user_id ORDER BY l.id DESC LIMIT 200`).all()));
-
-app.get("*",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
-
-
-// ROTAS DE CHAT E SUPORTE DO PEDIDO
+// ROTAS DE CHAT E SUPORTE DO PEDIDO (COM PERSISTÊNCIA PG)
 app.get("/api/orders/:id/messages", auth, (req, res) => {
-  const u = currentUser(req);
-  const orderId = Number(req.params.id);
-  const order = db.prepare("SELECT * FROM orders WHERE id=?").get(orderId);
-  if (!order) return res.status(404).json({ error: "Pedido não encontrado." });
-  const isAdmin = ADMIN_ROLES.has(u.role);
-  if (!isAdmin && order.user_id !== u.id) return res.status(403).json({ error: "Acesso negado." });
-  const msgs = db.prepare("SELECT * FROM order_messages WHERE order_id=? ORDER BY id ASC").all(orderId);
-  res.json({ order, messages: msgs });
+  try {
+    const u = currentUser(req);
+    const orderId = Number(req.params.id);
+    const order = db.prepare("SELECT * FROM orders WHERE id=?").get(orderId);
+    if (!order) return res.status(404).json({ error: "Pedido não encontrado." });
+    const isAdmin = ADMIN_ROLES.has(u.role);
+    if (!isAdmin && order.user_id !== u.id) return res.status(403).json({ error: "Acesso negado." });
+    const msgs = db.prepare("SELECT * FROM order_messages WHERE order_id=? ORDER BY id ASC").all(orderId);
+    res.json({ order, messages: msgs });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.post("/api/orders/:id/messages", auth, (req, res) => {
-  const u = currentUser(req);
-  const orderId = Number(req.params.id);
-  const msg = (req.body.message || "").trim();
-  if (!msg) return res.status(400).json({ error: "Mensagem vazia." });
-  const order = db.prepare("SELECT * FROM orders WHERE id=?").get(orderId);
-  if (!order) return res.status(404).json({ error: "Pedido não encontrado." });
-  const isAdmin = ADMIN_ROLES.has(u.role);
-  if (!isAdmin && order.user_id !== u.id) return res.status(403).json({ error: "Acesso negado." });
-  const role = isAdmin ? "admin" : "customer";
-  const name = u.name || (isAdmin ? "Suporte" : "Cliente");
-  const ins = db.prepare("INSERT INTO order_messages (order_id, sender_role, sender_name, message) VALUES (?, ?, ?, ?)").run(orderId, role, name, msg);
-  res.json({ ok: true, id: ins.lastInsertRowid });
+  try {
+    const u = currentUser(req);
+    const orderId = Number(req.params.id);
+    const msg = (req.body.message || "").trim();
+    if (!msg) return res.status(400).json({ error: "Mensagem vazia." });
+    const order = db.prepare("SELECT * FROM orders WHERE id=?").get(orderId);
+    if (!order) return res.status(404).json({ error: "Pedido não encontrado." });
+    const isAdmin = ADMIN_ROLES.has(u.role);
+    if (!isAdmin && order.user_id !== u.id) return res.status(403).json({ error: "Acesso negado." });
+    const role = isAdmin ? "admin" : "customer";
+    const name = u.name || (isAdmin ? "Suporte" : "Cliente");
+    const ins = db.prepare("INSERT INTO order_messages (order_id, sender_role, sender_name, message) VALUES (?, ?, ?, ?)").run(orderId, role, name, msg);
+    
+    if (typeof schedulePgSync === 'function') {
+      schedulePgSync();
+    }
+    
+    res.json({ ok: true, id: ins.lastInsertRowid });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.get("/api/admin/support/chats", admin, (req, res) => {
@@ -1013,6 +1022,7 @@ app.get("/api/admin/support/chats", admin, (req, res) => {
     const list = db.prepare(`
       SELECT o.id, o.customer_name, o.customer_phone, o.total, o.status,
              (SELECT message FROM order_messages WHERE order_id=o.id ORDER BY id DESC LIMIT 1) as last_message,
+             (SELECT sender_role FROM order_messages WHERE order_id=o.id ORDER BY id DESC LIMIT 1) as last_sender,
              (SELECT created_at FROM order_messages WHERE order_id=o.id ORDER BY id DESC LIMIT 1) as last_message_at,
              COUNT(m.id) as message_count
       FROM orders o
@@ -1026,48 +1036,36 @@ app.get("/api/admin/support/chats", admin, (req, res) => {
   }
 });
 
+app.get("/api/me/support/chats", auth, (req, res) => {
+  try {
+    const u = currentUser(req);
+    const list = db.prepare(`
+      SELECT o.id, o.customer_name, o.customer_phone, o.total, o.status,
+             (SELECT message FROM order_messages WHERE order_id=o.id ORDER BY id DESC LIMIT 1) as last_message,
+             (SELECT sender_role FROM order_messages WHERE order_id=o.id ORDER BY id DESC LIMIT 1) as last_sender,
+             (SELECT created_at FROM order_messages WHERE order_id=o.id ORDER BY id DESC LIMIT 1) as last_message_at,
+             COUNT(m.id) as message_count
+      FROM orders o
+      JOIN order_messages m ON m.order_id = o.id
+      WHERE o.user_id = ?
+      GROUP BY o.id
+      ORDER BY last_message_at DESC
+    `).all(u.id);
+    res.json(list);
+  } catch(e) {
+    res.json([]);
+  }
+});
 
-// DELETAR CATEGORIA NO ADMIN
 app.delete("/api/admin/categories/:id", admin, (req, res) => {
   try {
     const catId = Number(req.params.id);
     const info = db.prepare("DELETE FROM categories WHERE id=?").run(catId);
-    if (info.changes === 0) {
-      return res.status(404).json({ error: "Categoria não encontrada." });
-    }
-    res.json({ ok: true });
-  } catch(e) {
-    res.status(500).json({ error: "Erro ao excluir categoria: " + e.message });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log();
-  console.log("[Machado Express] Servidor iniciado na porta " + PORT);
-  console.log("[PostgreSQL] Persistência automática ativada.");
-  schedulePgSync();
-});
-
-app.post("/api/admin/products/:id/move", manager, (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const { dir } = req.body;
-    const cur = db.prepare("SELECT id, sort_order FROM products WHERE id = ?").get(id);
-    if (!cur) return res.status(404).json({ error: "Produto não encontrado" });
-    
-    let neighbor;
-    if (dir === "up") {
-      neighbor = db.prepare("SELECT id, sort_order FROM products WHERE sort_order < ? ORDER BY sort_order DESC LIMIT 1").get(cur.sort_order);
-    } else {
-      neighbor = db.prepare("SELECT id, sort_order FROM products WHERE sort_order > ? ORDER BY sort_order ASC LIMIT 1").get(cur.sort_order);
-    }
-    
-    if (neighbor) {
-      db.prepare("UPDATE products SET sort_order = ? WHERE id = ?").run(neighbor.sort_order, cur.id);
-      db.prepare("UPDATE products SET sort_order = ? WHERE id = ?").run(cur.sort_order, neighbor.id);
-    }
-    res.json({ ok: true });
+    if (typeof schedulePgSync === 'function') schedulePgSync();
+    res.json({ ok: info.changes > 0 });
   } catch(e) {
     res.status(500).json({ error: e.message });
   }
 });
+
+app.get("*",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
