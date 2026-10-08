@@ -1026,6 +1026,21 @@ app.get("/api/admin/support/chats", admin, (req, res) => {
   }
 });
 
+
+// DELETAR CATEGORIA NO ADMIN
+app.delete("/api/admin/categories/:id", admin, (req, res) => {
+  try {
+    const catId = Number(req.params.id);
+    const info = db.prepare("DELETE FROM categories WHERE id=?").run(catId);
+    if (info.changes === 0) {
+      return res.status(404).json({ error: "Categoria não encontrada." });
+    }
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: "Erro ao excluir categoria: " + e.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log();
   console.log("[Machado Express] Servidor iniciado na porta " + PORT);

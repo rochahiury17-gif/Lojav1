@@ -2489,3 +2489,160 @@ async function adminSupport() {
     </div>
   `;
 }
+
+
+// --- CORREÇÕES VISUAIS E FUNCIONAIS: PERFIL, ENDEREÇO, PEDIDOS E ADMIN DE CATEGORIAS ---
+
+// Redesenho moderno da Aba Perfil
+window.renderProfilePage = async function() {
+  if (!store.user) { location.hash = '#/login'; return; }
+  $('#app').innerHTML = `
+    <div style="max-width:600px;margin:24px auto;padding:16px;box-sizing:border-box;color:#fff;">
+      <div style="background:linear-gradient(145deg,#0c1322 0%,#090e1a 100%);border:1px solid rgba(34,211,238,0.3);border-radius:20px;padding:24px;box-shadow:0 12px 35px rgba(0,0,0,0.8);">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:16px;">
+          <div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#06b6d4,#0284c7);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:bold;color:#041019;">
+            ${esc((store.user.name||'U').charAt(0).toUpperCase())}
+          </div>
+          <div>
+            <h2 style="margin:0;font-size:20px;color:#fff;">Meu Perfil</h2>
+            <p style="margin:2px 0 0;font-size:13px;color:#94a3b8;">Gerencie suas informações pessoais e de acesso</p>
+          </div>
+        </div>
+
+        <form onsubmit="updateProfileData(event)" style="display:flex;flex-direction:column;gap:14px;">
+          <div>
+            <label style="display:block;font-size:12px;color:#38bdf8;font-weight:700;margin-bottom:6px;text-transform:uppercase;">Nome Completo</label>
+            <input id="prof-name" value="${esc(store.user.name || '')}" style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:12px 14px;color:#fff;font-size:14px;outline:none;" required>
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;color:#38bdf8;font-weight:700;margin-bottom:6px;text-transform:uppercase;">E-mail de Acesso</label>
+            <input id="prof-email" value="${esc(store.user.email || '')}" style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:12px 14px;color:#94a3b8;font-size:14px;outline:none;" disabled>
+            <small style="color:#64748b;font-size:11px;margin-top:4px;display:block;">O e-mail não pode ser alterado diretamente.</small>
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;color:#38bdf8;font-weight:700;margin-bottom:6px;text-transform:uppercase;">Telefone / WhatsApp</label>
+            <input id="prof-phone" value="${esc(store.user.phone || '')}" placeholder="(00) 00000-0000" style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:12px 14px;color:#fff;font-size:14px;outline:none;">
+          </div>
+          <button type="submit" style="margin-top:8px;background:linear-gradient(135deg,#06b6d4,#0284c7);color:#041019;border:none;padding:14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 0 15px rgba(6,182,212,0.4);">
+            Salvar Alterações
+          </button>
+        </form>
+      </div>
+    </div>
+  `;
+};
+
+window.updateProfileData = async function(e) {
+  e.preventDefault();
+  const name = $('#prof-name').value.trim();
+  const phone = $('#prof-phone').value.trim();
+  try {
+    const res = await api('/api/user/profile', {
+      method: 'PUT',
+      body: JSON.stringify({ name, phone })
+    });
+    if (res.ok) {
+      store.user.name = name;
+      store.user.phone = phone;
+      alert('Perfil atualizado com sucesso!');
+    }
+  } catch(err) {
+    alert('Erro ao atualizar perfil: ' + (err.message || err));
+  }
+};
+
+// Redesenho moderno da Aba Endereço
+window.renderAddressPage = async function() {
+  if (!store.user) { location.hash = '#/login'; return; }
+  let addr = store.user.address || {};
+  $('#app').innerHTML = `
+    <div style="max-width:600px;margin:24px auto;padding:16px;box-sizing:border-box;color:#fff;">
+      <div style="background:linear-gradient(145deg,#0c1322 0%,#090e1a 100%);border:1px solid rgba(34,211,238,0.3);border-radius:20px;padding:24px;box-shadow:0 12px 35px rgba(0,0,0,0.8);">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:16px;">
+          <div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#22d3ee,#06b6d4);display:flex;align-items:center;justify-content:center;font-size:22px;">
+            📍
+          </div>
+          <div>
+            <h2 style="margin:0;font-size:20px;color:#fff;">Meu Endereço de Entrega</h2>
+            <p style="margin:2px 0 0;font-size:13px;color:#94a3b8;">Cadastre o endereço para agilizar seus pedidos</p>
+          </div>
+        </div>
+
+        <form onsubmit="saveUserAddress(event)" style="display:flex;flex-direction:column;gap:14px;">
+          <div style="display:flex;gap:10px;">
+            <div style="flex:1;">
+              <label style="display:block;font-size:12px;color:#38bdf8;font-weight:700;margin-bottom:6px;text-transform:uppercase;">CEP</label>
+              <input id="adr-cep" value="${esc(addr.cep || '')}" placeholder="00000-000" style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:12px 14px;color:#fff;font-size:14px;outline:none;">
+            </div>
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;color:#38bdf8;font-weight:700;margin-bottom:6px;text-transform:uppercase;">Endereço / Rua</label>
+            <input id="adr-street" value="${esc(addr.street || '')}" placeholder="Ex: Av. Brasil" style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:12px 14px;color:#fff;font-size:14px;outline:none;" required>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <div style="flex:1;">
+              <label style="display:block;font-size:12px;color:#38bdf8;font-weight:700;margin-bottom:6px;text-transform:uppercase;">Número</label>
+              <input id="adr-number" value="${esc(addr.number || '')}" placeholder="Ex: 123" style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:12px 14px;color:#fff;font-size:14px;outline:none;" required>
+            </div>
+            <div style="flex:2;">
+              <label style="display:block;font-size:12px;color:#38bdf8;font-weight:700;margin-bottom:6px;text-transform:uppercase;">Complemento</label>
+              <input id="adr-comp" value="${esc(addr.complement || '')}" placeholder="Apto, Bloco..." style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:12px 14px;color:#fff;font-size:14px;outline:none;">
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <div style="flex:1;">
+              <label style="display:block;font-size:12px;color:#38bdf8;font-weight:700;margin-bottom:6px;text-transform:uppercase;">Bairro</label>
+              <input id="adr-neighborhood" value="${esc(addr.neighborhood || '')}" placeholder="Bairro" style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:12px 14px;color:#fff;font-size:14px;outline:none;" required>
+            </div>
+            <div style="flex:1;">
+              <label style="display:block;font-size:12px;color:#38bdf8;font-weight:700;margin-bottom:6px;text-transform:uppercase;">Cidade / UF</label>
+              <input id="adr-city" value="${esc(addr.city || '')}" placeholder="Cidade - UF" style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:12px 14px;color:#fff;font-size:14px;outline:none;" required>
+            </div>
+          </div>
+          <button type="submit" style="margin-top:8px;background:linear-gradient(135deg,#06b6d4,#0284c7);color:#041019;border:none;padding:14px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 0 15px rgba(6,182,212,0.4);">
+            Salvar Endereço
+          </button>
+        </form>
+      </div>
+    </div>
+  `;
+};
+
+window.saveUserAddress = async function(e) {
+  e.preventDefault();
+  const address = {
+    cep: $('#adr-cep').value.trim(),
+    street: $('#adr-street').value.trim(),
+    number: $('#adr-number').value.trim(),
+    complement: $('#adr-comp').value.trim(),
+    neighborhood: $('#adr-neighborhood').value.trim(),
+    city: $('#adr-city').value.trim()
+  };
+  try {
+    const res = await api('/api/user/address', {
+      method: 'PUT',
+      body: JSON.stringify({ address })
+    });
+    if (res.ok) {
+      store.user.address = address;
+      alert('Endereço salvo com sucesso!');
+    }
+  } catch(err) {
+    alert('Erro ao salvar endereço: ' + (err.message || err));
+  }
+};
+
+// Função para deletar categoria no Painel Admin
+window.deleteAdminCategory = async function(catId, catName) {
+  if (!confirm('Deseja realmente excluir a categoria "' + catName + '"?')) return;
+  try {
+    const res = await api('/api/admin/categories/' + catId, { method: 'DELETE' });
+    if (res.ok) {
+      alert('Categoria excluída com sucesso!');
+      if (typeof adminCategories === 'function') adminCategories();
+      else location.reload();
+    }
+  } catch(err) {
+    alert('Erro ao excluir categoria: ' + (err.message || err));
+  }
+};
