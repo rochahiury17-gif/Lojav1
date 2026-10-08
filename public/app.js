@@ -2500,6 +2500,8 @@ async function adminSupport() {
 
   window.renderChatList = renderChatList;
 
+  window.renderChatList = renderChatList;
+
   $('#app').innerHTML = `
     <div class="admin-shell">
       <aside class="admin-side">
@@ -2753,6 +2755,7 @@ window.renderAccount = async function(subTab = 'pedidos') {
       <!-- ABAS DE NAVEGAÇÃO DA CONTA -->
       <div style="display:flex;gap:8px;margin-bottom:20px;background:rgba(12,19,34,0.8);padding:6px;border-radius:14px;border:1px solid rgba(255,255,255,0.08);">
         <button onclick="location.hash='#/conta/pedidos'" style="flex:1;background:${activeTab==='pedidos'?'linear-gradient(135deg,#06b6d4,#0284c7)':'transparent'};color:${activeTab==='pedidos'?'#041019':'#cbd5e1'};border:none;padding:10px;border-radius:10px;font-weight:800;font-size:12px;cursor:pointer;">📦 Meus Pedidos</button>
+        <button onclick="location.hash='#/conta/suporte'" style="flex:1;background:${activeTab==='suporte'?'linear-gradient(135deg,#06b6d4,#0284c7)':'transparent'};color:${activeTab==='suporte'?'#041019':'#cbd5e1'};border:none;padding:10px;border-radius:10px;font-weight:800;font-size:12px;cursor:pointer;">🎧 Atendimento</button>
         <button onclick="location.hash='#/conta/suporte'" style="flex:1;background:${activeTab==='suporte'?'linear-gradient(135deg,#06b6d4,#0284c7)':'transparent'};color:${activeTab==='suporte'?'#041019':'#cbd5e1'};border:none;padding:10px;border-radius:10px;font-weight:800;font-size:12px;cursor:pointer;">🎧 Atendimento</button>
         <button onclick="location.hash='#/conta/perfil'" style="flex:1;background:${activeTab==='perfil'?'linear-gradient(135deg,#06b6d4,#0284c7)':'transparent'};color:${activeTab==='perfil'?'#041019':'#cbd5e1'};border:none;padding:10px;border-radius:10px;font-weight:800;font-size:12px;cursor:pointer;">👤 Perfil</button>
         <button onclick="location.hash='#/conta/endereco'" style="flex:1;background:${activeTab==='endereco'?'linear-gradient(135deg,#06b6d4,#0284c7)':'transparent'};color:${activeTab==='endereco'?'#041019':'#cbd5e1'};border:none;padding:10px;border-radius:10px;font-weight:800;font-size:12px;cursor:pointer;">📍 Endereço</button>
