@@ -233,6 +233,42 @@ try {
   db.exec("ALTER TABLE support_tickets ADD COLUMN closed_at TEXT DEFAULT NULL;");
 } catch(e) {}
 
+// SUPORTE_GERAL_SCHEMA_V1
+try {
+  db.exec("ALTER TABLE support_tickets ADD COLUMN assigned_admin_id INTEGER DEFAULT NULL;");
+} catch(e) {}
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS support_chats (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  order_id INTEGER DEFAULT NULL,
+  status TEXT NOT NULL DEFAULT 'novo',
+  unread_admin INTEGER NOT NULL DEFAULT 0,
+  unread_customer INTEGER NOT NULL DEFAULT 0,
+  assigned_admin_id INTEGER DEFAULT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  closed_at TEXT DEFAULT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE SET NULL,
+  FOREIGN KEY(assigned_admin_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS support_chat_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chat_id INTEGER NOT NULL,
+  sender_role TEXT NOT NULL,
+  sender_id INTEGER DEFAULT NULL,
+  sender_name TEXT NOT NULL,
+  message TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(chat_id) REFERENCES support_chats(id) ON DELETE CASCADE,
+  FOREIGN KEY(sender_id) REFERENCES users(id) ON DELETE SET NULL
+);
+`);
+
+
 
 
 // PERSISTENCIA DE CONFIGURACOES EM ARQUIVO
@@ -1097,6 +1133,526 @@ app.post("/api/orders/:id/messages", auth, (req, res) => {
   }
 });
 
+
+// SUPORTE_GERAL_ROUTES_V1
+// Atendimento independente de pedido.
+
+app.post("/api/me/support/chats", auth, (req, res) => {
+  try {
+    const u = currentUser(req);
+
+    const existing = db.prepare(`
+      SELECT *
+      FROM support_chats
+      WHERE user_id=?
+        AND status <> 'finalizado'
+      ORDER BY updated_at DESC, id DESC
+      LIMIT 1
+    `).get(u.id);
+
+    if (existing) return res.json(existing);
+
+    const now = new Date().toISOString();
+
+    const result = db.prepare(`
+      INSERT INTO support_chats
+        (user_id, status, unread_admin, unread_customer, created_at, updated_at)
+      VALUES (?, 'novo', 1, 0, ?, ?)
+    `).run(u.id, now, now);
+
+    if (typeof schedulePgSync === "function") schedulePgSync();
+
+    res.json({
+      ok: true,
+      id: Number(result.lastInsertRowid),
+      status: "novo"
+    });
+  } catch(e) {
+    console.error("[SUPORTE GERAL] criar:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/me/support/general-chats", auth, (req, res) => {
+  try {
+    const u = currentUser(req);
+
+    const list = db.prepare(`
+      SELECT
+        sc.*,
+        au.name AS assigned_admin_name,
+
+        (
+          SELECT message
+          FROM support_chat_messages
+          WHERE chat_id=sc.id
+          ORDER BY id DESC
+          LIMIT 1
+        ) AS last_message,
+
+        (
+          SELECT sender_role
+          FROM support_chat_messages
+          WHERE chat_id=sc.id
+          ORDER BY id DESC
+          LIMIT 1
+        ) AS last_sender,
+
+        (
+          SELECT created_at
+          FROM support_chat_messages
+          WHERE chat_id=sc.id
+          ORDER BY id DESC
+          LIMIT 1
+        ) AS last_message_at,
+
+        (
+          SELECT COUNT(*)
+          FROM support_chat_messages
+          WHERE chat_id=sc.id
+        ) AS message_count
+
+      FROM support_chats sc
+      LEFT JOIN users au ON au.id=sc.assigned_admin_id
+      WHERE sc.user_id=?
+      ORDER BY sc.updated_at DESC, sc.id DESC
+    `).all(u.id);
+
+    res.json(list);
+  } catch(e) {
+    console.error("[SUPORTE GERAL] lista cliente:", e);
+    res.status(500).json({ error: e.message, data: [] });
+  }
+});
+
+app.get("/api/me/support/general-chats/:id/messages", auth, (req, res) => {
+  try {
+    const u = currentUser(req);
+    const chatId = Number(req.params.id);
+
+    const chat = db.prepare(`
+      SELECT *
+      FROM support_chats
+      WHERE id=? AND user_id=?
+    `).get(chatId, u.id);
+
+    if (!chat) {
+      return res.status(404).json({
+        error: "Conversa de suporte não encontrada."
+      });
+    }
+
+    const messages = db.prepare(`
+      SELECT id, chat_id, sender_role, sender_id,
+             sender_name, message, created_at
+      FROM support_chat_messages
+      WHERE chat_id=?
+      ORDER BY id ASC
+    `).all(chatId);
+
+    db.prepare(`
+      UPDATE support_chats
+      SET unread_customer=0,
+          updated_at=?
+      WHERE id=?
+    `).run(new Date().toISOString(), chatId);
+
+    if (typeof schedulePgSync === "function") schedulePgSync();
+
+    res.json({ chat, messages });
+  } catch(e) {
+    console.error("[SUPORTE GERAL] mensagens cliente:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/me/support/general-chats/:id/messages", auth, (req, res) => {
+  try {
+    const u = currentUser(req);
+    const chatId = Number(req.params.id);
+    const msg = String(req.body.message || "").trim();
+
+    if (!msg) {
+      return res.status(400).json({ error: "Mensagem vazia." });
+    }
+
+    const chat = db.prepare(`
+      SELECT *
+      FROM support_chats
+      WHERE id=? AND user_id=?
+    `).get(chatId, u.id);
+
+    if (!chat) {
+      return res.status(404).json({
+        error: "Conversa de suporte não encontrada."
+      });
+    }
+
+    if (chat.status === "finalizado") {
+      return res.status(400).json({
+        error: "Este atendimento foi finalizado. Reabra para continuar."
+      });
+    }
+
+    const now = new Date().toISOString();
+
+    const result = db.prepare(`
+      INSERT INTO support_chat_messages
+        (chat_id, sender_role, sender_id, sender_name, message, created_at)
+      VALUES (?, 'customer', ?, ?, ?, ?)
+    `).run(
+      chatId,
+      u.id,
+      u.name || "Cliente",
+      msg,
+      now
+    );
+
+    db.prepare(`
+      UPDATE support_chats
+      SET status='novo',
+          unread_admin=unread_admin+1,
+          updated_at=?,
+          closed_at=NULL
+      WHERE id=?
+    `).run(now, chatId);
+
+    if (typeof schedulePgSync === "function") schedulePgSync();
+
+    res.json({
+      ok: true,
+      id: Number(result.lastInsertRowid),
+      status: "novo"
+    });
+  } catch(e) {
+    console.error("[SUPORTE GERAL] mensagem cliente:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/me/support/general-chats/:id/reopen", auth, (req, res) => {
+  try {
+    const u = currentUser(req);
+    const chatId = Number(req.params.id);
+    const now = new Date().toISOString();
+
+    const result = db.prepare(`
+      UPDATE support_chats
+      SET status='novo',
+          unread_admin=1,
+          closed_at=NULL,
+          updated_at=?
+      WHERE id=? AND user_id=?
+    `).run(now, chatId, u.id);
+
+    if (!result.changes) {
+      return res.status(404).json({
+        error: "Conversa de suporte não encontrada."
+      });
+    }
+
+    if (typeof schedulePgSync === "function") schedulePgSync();
+
+    res.json({ ok: true, status: "novo" });
+  } catch(e) {
+    console.error("[SUPORTE GERAL] reabrir cliente:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/admin/support/general-chats", admin, (req, res) => {
+  try {
+    const list = db.prepare(`
+      SELECT
+        sc.*,
+        u.name AS customer_name,
+        u.phone AS customer_phone,
+        au.name AS assigned_admin_name,
+
+        (
+          SELECT message
+          FROM support_chat_messages
+          WHERE chat_id=sc.id
+          ORDER BY id DESC
+          LIMIT 1
+        ) AS last_message,
+
+        (
+          SELECT sender_role
+          FROM support_chat_messages
+          WHERE chat_id=sc.id
+          ORDER BY id DESC
+          LIMIT 1
+        ) AS last_sender,
+
+        (
+          SELECT created_at
+          FROM support_chat_messages
+          WHERE chat_id=sc.id
+          ORDER BY id DESC
+          LIMIT 1
+        ) AS last_message_at,
+
+        (
+          SELECT COUNT(*)
+          FROM support_chat_messages
+          WHERE chat_id=sc.id
+        ) AS message_count
+
+      FROM support_chats sc
+      JOIN users u ON u.id=sc.user_id
+      LEFT JOIN users au ON au.id=sc.assigned_admin_id
+      ORDER BY sc.updated_at DESC, sc.id DESC
+    `).all();
+
+    res.json(list);
+  } catch(e) {
+    console.error("[SUPORTE GERAL] lista ADM:", e);
+    res.status(500).json({ error: e.message, data: [] });
+  }
+});
+
+app.get("/api/admin/support/general-chats/:id/messages", admin, (req, res) => {
+  try {
+    const chatId = Number(req.params.id);
+
+    const chat = db.prepare(`
+      SELECT
+        sc.*,
+        u.name AS customer_name,
+        u.phone AS customer_phone,
+        au.name AS assigned_admin_name
+      FROM support_chats sc
+      JOIN users u ON u.id=sc.user_id
+      LEFT JOIN users au ON au.id=sc.assigned_admin_id
+      WHERE sc.id=?
+    `).get(chatId);
+
+    if (!chat) {
+      return res.status(404).json({
+        error: "Conversa de suporte não encontrada."
+      });
+    }
+
+    const messages = db.prepare(`
+      SELECT id, chat_id, sender_role, sender_id,
+             sender_name, message, created_at
+      FROM support_chat_messages
+      WHERE chat_id=?
+      ORDER BY id ASC
+    `).all(chatId);
+
+    db.prepare(`
+      UPDATE support_chats
+      SET unread_admin=0,
+          updated_at=?
+      WHERE id=?
+    `).run(new Date().toISOString(), chatId);
+
+    if (typeof schedulePgSync === "function") schedulePgSync();
+
+    res.json({ chat, messages });
+  } catch(e) {
+    console.error("[SUPORTE GERAL] mensagens ADM:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/admin/support/general-chats/:id/assume", admin, (req, res) => {
+  try {
+    const u = currentUser(req);
+    const chatId = Number(req.params.id);
+
+    const chat = db.prepare(`
+      SELECT *
+      FROM support_chats
+      WHERE id=?
+    `).get(chatId);
+
+    if (!chat) {
+      return res.status(404).json({
+        error: "Conversa de suporte não encontrada."
+      });
+    }
+
+    const alreadyAssigned =
+      Number(chat.assigned_admin_id || 0) === Number(u.id);
+
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      UPDATE support_chats
+      SET status='andamento',
+          assigned_admin_id=?,
+          unread_admin=0,
+          updated_at=?,
+          closed_at=NULL
+      WHERE id=?
+    `).run(u.id, now, chatId);
+
+    let welcomeSent = false;
+
+    if (!alreadyAssigned) {
+      const name = u.name || "Atendimento";
+
+      const welcome =
+        `👋 Olá! Eu sou ${name}, da equipe Machado Express, e acabei de assumir seu atendimento. ` +
+        `Seja bem-vindo(a)! Como posso ajudar? Conte pra mim o que você precisa.`;
+
+      db.prepare(`
+        INSERT INTO support_chat_messages
+          (chat_id, sender_role, sender_id, sender_name, message, created_at)
+        VALUES (?, 'admin', ?, ?, ?, ?)
+      `).run(chatId, u.id, name, welcome, now);
+
+      db.prepare(`
+        UPDATE support_chats
+        SET unread_customer=unread_customer+1,
+            updated_at=?
+        WHERE id=?
+      `).run(now, chatId);
+
+      welcomeSent = true;
+    }
+
+    if (typeof schedulePgSync === "function") schedulePgSync();
+
+    res.json({
+      ok: true,
+      status: "andamento",
+      assigned_admin_id: Number(u.id),
+      assigned_admin_name: u.name || "Atendimento",
+      welcome_sent: welcomeSent
+    });
+  } catch(e) {
+    console.error("[SUPORTE GERAL] assumir:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/admin/support/general-chats/:id/messages", admin, (req, res) => {
+  try {
+    const u = currentUser(req);
+    const chatId = Number(req.params.id);
+    const msg = String(req.body.message || "").trim();
+
+    if (!msg) {
+      return res.status(400).json({ error: "Mensagem vazia." });
+    }
+
+    const chat = db.prepare(`
+      SELECT *
+      FROM support_chats
+      WHERE id=?
+    `).get(chatId);
+
+    if (!chat) {
+      return res.status(404).json({
+        error: "Conversa de suporte não encontrada."
+      });
+    }
+
+    if (chat.status === "finalizado") {
+      return res.status(400).json({
+        error: "Este atendimento foi finalizado. Reabra para continuar."
+      });
+    }
+
+    const now = new Date().toISOString();
+
+    const result = db.prepare(`
+      INSERT INTO support_chat_messages
+        (chat_id, sender_role, sender_id, sender_name, message, created_at)
+      VALUES (?, 'admin', ?, ?, ?, ?)
+    `).run(
+      chatId,
+      u.id,
+      u.name || "Atendimento",
+      msg,
+      now
+    );
+
+    db.prepare(`
+      UPDATE support_chats
+      SET status='aguardando_cliente',
+          unread_customer=unread_customer+1,
+          updated_at=?,
+          closed_at=NULL
+      WHERE id=?
+    `).run(now, chatId);
+
+    if (typeof schedulePgSync === "function") schedulePgSync();
+
+    res.json({
+      ok: true,
+      id: Number(result.lastInsertRowid),
+      status: "aguardando_cliente"
+    });
+  } catch(e) {
+    console.error("[SUPORTE GERAL] mensagem ADM:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/admin/support/general-chats/:id/finalize", admin, (req, res) => {
+  try {
+    const chatId = Number(req.params.id);
+    const now = new Date().toISOString();
+
+    const result = db.prepare(`
+      UPDATE support_chats
+      SET status='finalizado',
+          unread_admin=0,
+          unread_customer=0,
+          updated_at=?,
+          closed_at=?
+      WHERE id=?
+    `).run(now, now, chatId);
+
+    if (!result.changes) {
+      return res.status(404).json({
+        error: "Conversa de suporte não encontrada."
+      });
+    }
+
+    if (typeof schedulePgSync === "function") schedulePgSync();
+
+    res.json({ ok: true, status: "finalizado" });
+  } catch(e) {
+    console.error("[SUPORTE GERAL] finalizar:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/admin/support/general-chats/:id/reopen", admin, (req, res) => {
+  try {
+    const chatId = Number(req.params.id);
+    const now = new Date().toISOString();
+
+    const result = db.prepare(`
+      UPDATE support_chats
+      SET status='andamento',
+          unread_admin=0,
+          closed_at=NULL,
+          updated_at=?
+      WHERE id=?
+    `).run(now, chatId);
+
+    if (!result.changes) {
+      return res.status(404).json({
+        error: "Conversa de suporte não encontrada."
+      });
+    }
+
+    if (typeof schedulePgSync === "function") schedulePgSync();
+
+    res.json({ ok: true, status: "andamento" });
+  } catch(e) {
+    console.error("[SUPORTE GERAL] reabrir ADM:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get("/api/admin/support/chats", admin, (req, res) => {
   try {
     // Garante tickets para conversas antigas.
@@ -1336,9 +1892,16 @@ app.post("/api/admin/support/:orderId/assume", admin, (req, res) => {
   try {
     const orderId = Number(req.params.orderId);
 
-    const ticket = db.prepare(
-      "SELECT * FROM support_tickets WHERE order_id=?"
-    ).get(orderId);
+    const ticket = db.prepare(`
+      SELECT
+        st.*,
+        o.user_id,
+        u.name AS customer_name
+      FROM support_tickets st
+      JOIN orders o ON o.id = st.order_id
+      LEFT JOIN users u ON u.id = o.user_id
+      WHERE st.order_id=?
+    `).get(orderId);
 
     if (!ticket) {
       return res.status(404).json({
@@ -1346,23 +1909,71 @@ app.post("/api/admin/support/:orderId/assume", admin, (req, res) => {
       });
     }
 
+    const adminId = Number(req.user?.id || req.user?.user_id || 0);
+    const adminName =
+      String(req.user?.name || req.user?.nome || "Atendimento").trim();
+
+    const previousAssigned = ticket.assigned_admin_id
+      ? Number(ticket.assigned_admin_id)
+      : null;
+
+    const now = new Date().toISOString();
+
     db.prepare(`
       UPDATE support_tickets
       SET
         status='andamento',
         unread_admin=0,
+        assigned_admin_id=?,
         updated_at=?,
         closed_at=NULL
       WHERE order_id=?
-    `).run(new Date().toISOString(), orderId);
+    `).run(
+      adminId || null,
+      now,
+      orderId
+    );
+
+    let welcomeSent = false;
+
+    if (previousAssigned !== adminId) {
+      const welcome =
+        `👋 Olá! Eu sou ${adminName}, da equipe Machado Express, e acabei de assumir seu atendimento. Seja bem-vindo(a)! Como posso ajudar? Conte pra mim o que você precisa.`;
+
+      db.prepare(`
+        INSERT INTO order_messages
+          (order_id, sender_role, sender_name, message, created_at)
+        VALUES
+          (?, 'admin', ?, ?, ?)
+      `).run(
+        orderId,
+        adminName,
+        welcome,
+        now
+      );
+
+      db.prepare(`
+        UPDATE support_tickets
+        SET
+          unread_customer=unread_customer+1,
+          updated_at=?
+        WHERE order_id=?
+      `).run(now, orderId);
+
+      welcomeSent = true;
+    }
 
     schedulePgSync();
 
     res.json({
       ok: true,
-      status: "andamento"
+      status: "andamento",
+      assigned_admin_id: adminId || null,
+      assigned_admin_name: adminName,
+      welcome_sent: welcomeSent
     });
   } catch(e) {
+    console.error("[SUPORTE] erro ao assumir:", e);
     res.status(500).json({ error: e.message });
   }
 });

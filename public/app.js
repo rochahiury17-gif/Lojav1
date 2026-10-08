@@ -222,6 +222,26 @@ async function home(){
         <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:12px;display:flex;align-items:center;gap:10px;">
           <span style="font-size:22px;">💬</span>
           <div><b style="font-size:12px;color:#fff;display:block;">Suporte Humanizado</b><span style="font-size:10px;color:#94a3b8;">Direto no WhatsApp</span></div>
+          <a
+            href="#/suporte"
+            class="machado-home-support-button"
+            style="
+              display:inline-flex;
+              align-items:center;
+              justify-content:center;
+              gap:8px;
+              margin-top:10px;
+              padding:10px 14px;
+              border-radius:12px;
+              background:#111827;
+              color:#fff;
+              text-decoration:none;
+              font-weight:800;
+              font-size:13px;
+            "
+          >
+            🎧 Abrir Central de Suporte
+          </a>
         </div>
       </div>
     </section>
@@ -1161,7 +1181,8 @@ async function adminPosts(){if(!await requireAdmin())return;let ps=await api("/a
 async function generatePost(id,btn){let old=btn.innerHTML;btn.disabled=true;btn.innerHTML="Gerando…";try{let d=await api("/api/admin/posts/generate/"+id,{method:"POST"});toast("Post gerado com sucesso!");let a=document.createElement("a");a.href=d.url;a.target="_blank";a.rel="noopener";a.textContent="Abrir arte gerada";a.className="generated-link";btn.parentElement.appendChild(a)}catch(e){toast(e.message,"warn")}finally{btn.disabled=false;btn.innerHTML=old}}
 async function adminConfig(){if(!await requireAdmin(true))return;let s=await api("/api/admin/settings");adminShell("Configurações",`<div class="config-grid"><form class="panel config-form" onsubmit="saveSettings(event)"><span>IDENTIDADE</span><h3>Home e marca</h3><label>Nome da loja<input name="store_name" value="${esc(s.store_name)}"></label><label>Descrição<textarea name="store_description">${esc(s.store_description)}</textarea></label><label>Imagem do banner<input name="banner_file" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><small class="field-hint">Envie a imagem para ela ficar salva no próprio site. ${s.banner_image?"Banner local atual: "+esc(s.banner_image):"Usando o banner padrão."}</small></label><label>Título do banner<input name="banner_title" value="${esc(s.banner_title)}"></label><label>Texto do banner<textarea name="banner_subtitle">${esc(s.banner_subtitle)}</textarea></label><label>Botão do banner<input name="banner_button" value="${esc(s.banner_button)}"></label><button class="btn primary">Salvar alterações</button></form><form class="panel config-form" onsubmit="saveSettings(event)"><span>CONTATO</span><h3>Informações da loja</h3><label>E-mail<input name="store_email" value="${esc(s.store_email)}"></label><label>Telefone<input name="store_phone" value="${esc(s.store_phone)}"></label><label>WhatsApp<input name="store_whatsapp" value="${esc(s.store_whatsapp)}"></label><span>CHECKOUT</span><h3>Pix e frete</h3><label>Chave Pix<input name="pix_key" value="${esc(s.pix_key)}"></label><label>Nome do recebedor<input name="pix_name" value="${esc(s.pix_name)}"></label><label>Cidade<input name="pix_city" value="${esc(s.pix_city)}"></label><label>Frete grátis acima de R$<input name="free_shipping_min" type="number" step=".01" value="${esc(s.free_shipping_min)}"></label><button class="btn primary">Salvar configurações</button></form></div>`)}
 async function saveSettings(e){e.preventDefault();try{const fd=new FormData(e.target);const body=Object.fromEntries(fd.entries());const banner=fd.get("banner_file");delete body.banner_file;if(banner&&banner.size>0){body.banner_image=await uploadLocalImage(banner)}else{delete body.banner_image;}await api("/api/admin/settings",{method:"PATCH",body:JSON.stringify(body)});await load();toast("Configurações salvas com sucesso!");location.hash="#/admin/config"}catch(x){console.error(x);toast(x.message||"Erro ao salvar configurações","warn");}}
-async function route(){let h=location.hash||"#/";try{if(h.startsWith("#/produto/")){window.scrollTo(0,0);return await productDetail(h.replace("#/produto/","").split("?")[0]);}if(h==="#/"||h==="#")return await home();if(h.startsWith("#/produtos"))return await products();if(h==="#/login")return await login();if(h==="#/registro")return await register();if(h==="#/conta")return await account();if(h==="#/admin")return await admin();if(h==="#/admin/produtos")return await adminProducts();if(h==="#/admin/pedidos")return await adminOrders();if(h==="#/admin/suporte")return await window.adminSupport();
+async function route(){let h=location.hash||"#/";try{if(h.startsWith("#/produto/")){window.scrollTo(0,0);return await productDetail(h.replace("#/produto/","").split("?")[0]);}if(h==="#/"||h==="#")return await home();if(h.startsWith("#/produtos"))return await products();if(h==="#/login")return await login();if(h==="#/registro")return await register();if(h==="#/suporte")return await window.machadoSupportCenter();
+if(h==="#/conta")return await account();if(h==="#/admin")return await admin();if(h==="#/admin/produtos")return await adminProducts();if(h==="#/admin/pedidos")return await adminOrders();if(h==="#/admin/suporte")return await window.adminSupport();
 if(h==="#/admin/clientes")return await adminCustomers();if(h==="#/admin/equipe")return await adminTeam();if(h==="#/admin/config")return await adminConfig();if(h==="#/admin/posts")return await adminPosts();return await home()}catch(e){toast(e.message,"warn")}}
 window.addEventListener("hashchange",route);load();
 function renderFooter() {
@@ -1748,6 +1769,640 @@ window.quickView = function(p) {
 
     render();
   };
+// MACHADO_SUPORTE_GERAL_FRONT_V1
+(() => {
+  let supportRefreshTimer = null;
+
+  function supportStatusInfo(status) {
+    const map = {
+      novo: {
+        label: "Aguardando atendimento",
+        icon: "🆕"
+      },
+      andamento: {
+        label: "Em atendimento",
+        icon: "🛠️"
+      },
+      aguardando_cliente: {
+        label: "Aguardando você",
+        icon: "💬"
+      },
+      finalizado: {
+        label: "Finalizado",
+        icon: "✅"
+      }
+    };
+
+    return map[status] || map.novo;
+  }
+
+  function supportStatusLabel(status) {
+    return supportStatusInfo(status).label;
+  }
+
+  async function createGeneralSupportChat() {
+    const result = await api("/api/me/support/chats", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({})
+    });
+
+    const id = Number(result?.id || result?.chat?.id);
+
+    if (!id) {
+      throw new Error("Não foi possível abrir o atendimento.");
+    }
+
+    location.hash = "#/suporte";
+    return id;
+  }
+
+  window.machadoSupportCenter = async function() {
+    if (!store.user) {
+      location.hash = "#/login";
+      return;
+    }
+
+    const app = $("#app");
+
+    app.innerHTML = `
+      <main class="container" style="max-width:1100px;margin:0 auto;padding:24px 14px 60px;">
+        <section style="
+          background:linear-gradient(135deg,#111827,#1f2937);
+          color:#fff;
+          border-radius:22px;
+          padding:24px;
+          margin-bottom:18px;
+          box-shadow:0 12px 30px rgba(0,0,0,.12);
+        ">
+          <div style="font-size:13px;font-weight:800;opacity:.8;">
+            MACHADO EXPRESS
+          </div>
+
+          <h1 style="margin:6px 0 8px;font-size:28px;">
+            🎧 Central de Suporte
+          </h1>
+
+          <p style="margin:0;line-height:1.6;max-width:760px;opacity:.92;">
+            Precisa de ajuda? Você pode falar com nossa equipe mesmo sem ter um
+            pedido aberto. Escolha uma conversa abaixo ou abra um novo atendimento.
+          </p>
+
+          <button
+            id="machadoNewSupport"
+            style="
+              margin-top:18px;
+              border:0;
+              border-radius:12px;
+              padding:12px 16px;
+              background:#fff;
+              color:#111827;
+              font-weight:900;
+              cursor:pointer;
+            "
+          >
+            ➕ Novo atendimento
+          </button>
+        </section>
+
+        <section style="
+          background:#fff;
+          border:1px solid #e5e7eb;
+          border-radius:18px;
+          overflow:hidden;
+        ">
+          <div style="
+            padding:16px;
+            border-bottom:1px solid #e5e7eb;
+          ">
+            <h2 style="margin:0 0 5px;font-size:19px;">
+              💬 Minhas conversas
+            </h2>
+            <p style="margin:0;color:#6b7280;font-size:13px;">
+              Acompanhe seus atendimentos e continue uma conversa quando precisar.
+            </p>
+          </div>
+
+          <div
+            id="machadoSupportTabs"
+            style="
+              display:flex;
+              gap:8px;
+              padding:12px;
+              overflow-x:auto;
+              border-bottom:1px solid #e5e7eb;
+            "
+          ></div>
+
+          <div id="machadoSupportList" style="padding:14px;"></div>
+        </section>
+      </main>
+    `;
+
+    const newBtn = document.getElementById("machadoNewSupport");
+
+    if (newBtn) {
+      newBtn.onclick = async () => {
+        try {
+          newBtn.disabled = true;
+          newBtn.textContent = "Abrindo...";
+          const id = await createGeneralSupportChat();
+          await renderSupportChat(id);
+        } catch (e) {
+          toast(e.message || "Não foi possível abrir o suporte.", "warn");
+        } finally {
+          newBtn.disabled = false;
+          newBtn.textContent = "➕ Novo atendimento";
+        }
+      };
+    }
+
+    let chats = [];
+
+    try {
+      const data = await api("/api/me/support/general-chats");
+      chats = Array.isArray(data) ? data : [];
+    } catch (e) {
+      console.error("[SUPORTE GERAL]", e);
+      chats = [];
+    }
+
+    window.__machadoGeneralSupportChats = chats;
+
+    const tabs = [
+      ["todos", "Todos"],
+      ["andamento", "Em andamento"],
+      ["aguardando_cliente", "Aguardando você"],
+      ["finalizado", "Finalizados"]
+    ];
+
+    let currentFilter = "todos";
+
+    function renderTabs() {
+      const tabsEl = document.getElementById("machadoSupportTabs");
+      if (!tabsEl) return;
+
+      tabsEl.innerHTML = tabs.map(([value, label]) => {
+        const active = value === currentFilter;
+
+        return `
+          <button
+            data-support-filter="${esc(value)}"
+            style="
+              border:1px solid ${active ? "#111827" : "#e5e7eb"};
+              background:${active ? "#111827" : "#fff"};
+              color:${active ? "#fff" : "#374151"};
+              border-radius:999px;
+              padding:9px 13px;
+              font-weight:800;
+              font-size:12px;
+              white-space:nowrap;
+              cursor:pointer;
+            "
+          >
+            ${esc(label)}
+          </button>
+        `;
+      }).join("");
+
+      tabsEl.querySelectorAll("[data-support-filter]").forEach(btn => {
+        btn.onclick = () => {
+          currentFilter = btn.dataset.supportFilter;
+          renderTabs();
+          renderList();
+        };
+      });
+    }
+
+    function renderList() {
+      const listEl = document.getElementById("machadoSupportList");
+      if (!listEl) return;
+
+      let list = window.__machadoGeneralSupportChats || [];
+
+      if (currentFilter !== "todos") {
+        list = list.filter(c =>
+          String(c.status || "novo") === currentFilter
+        );
+      }
+
+      if (!list.length) {
+        listEl.innerHTML = `
+          <div style="
+            padding:36px 18px;
+            text-align:center;
+            color:#6b7280;
+          ">
+            <div style="font-size:38px;margin-bottom:10px;">💬</div>
+            <strong style="display:block;color:#111827;margin-bottom:6px;">
+              Nenhuma conversa nesta aba
+            </strong>
+            <span style="font-size:13px;">
+              Abra um atendimento quando precisar falar com nossa equipe.
+            </span>
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = list.map(chat => {
+        const status = String(chat.status || "novo");
+        const info = supportStatusInfo(status);
+        const unread = Number(chat.unread_customer || 0);
+        const last = chat.last_message || "Atendimento aberto. Envie sua mensagem.";
+
+        return `
+          <article
+            style="
+              border:1px solid #e5e7eb;
+              border-radius:16px;
+              padding:16px;
+              margin-bottom:10px;
+              cursor:pointer;
+              background:#fff;
+            "
+            data-general-support-id="${Number(chat.id)}"
+          >
+            <div style="
+              display:flex;
+              justify-content:space-between;
+              gap:12px;
+              align-items:flex-start;
+            ">
+              <div>
+                <strong style="display:block;font-size:15px;">
+                  🎧 Atendimento #${Number(chat.id)}
+                </strong>
+
+                <span style="
+                  display:inline-block;
+                  margin-top:6px;
+                  padding:5px 9px;
+                  border-radius:999px;
+                  background:#f3f4f6;
+                  color:#374151;
+                  font-size:11px;
+                  font-weight:800;
+                ">
+                  ${info.icon} ${esc(info.label)}
+                </span>
+              </div>
+
+              ${
+                unread > 0
+                  ? `<span style="
+                       min-width:24px;
+                       height:24px;
+                       border-radius:999px;
+                       display:flex;
+                       align-items:center;
+                       justify-content:center;
+                       background:#dc2626;
+                       color:#fff;
+                       font-size:11px;
+                       font-weight:900;
+                     ">${unread}</span>`
+                  : ""
+              }
+            </div>
+
+            <div style="
+              margin-top:12px;
+              color:#4b5563;
+              font-size:13px;
+              line-height:1.5;
+            ">
+              ${esc(last)}
+            </div>
+
+            <div style="
+              margin-top:12px;
+              color:#9ca3af;
+              font-size:11px;
+            ">
+              ${
+                chat.assigned_admin_name
+                  ? `Atendimento: ${esc(chat.assigned_admin_name)}`
+                  : "Aguardando um membro da equipe"
+              }
+            </div>
+          </article>
+        `;
+      }).join("");
+
+      listEl.querySelectorAll("[data-general-support-id]").forEach(card => {
+        card.onclick = () => {
+          renderSupportChat(Number(card.dataset.generalSupportId));
+        };
+      });
+    }
+
+    renderTabs();
+    renderList();
+
+    if (supportRefreshTimer) {
+      clearInterval(supportRefreshTimer);
+    }
+
+    supportRefreshTimer = setInterval(async () => {
+      if (!document.body.contains(app) || document.hidden) return;
+
+      try {
+        const data = await api("/api/me/support/general-chats");
+        window.__machadoGeneralSupportChats =
+          Array.isArray(data) ? data : [];
+
+        renderList();
+      } catch {}
+    }, 5000);
+  };
+
+  async function renderSupportChat(chatId) {
+    const app = $("#app");
+
+    if (supportRefreshTimer) {
+      clearInterval(supportRefreshTimer);
+      supportRefreshTimer = null;
+    }
+
+    app.innerHTML = `
+      <main class="container" style="max-width:900px;margin:0 auto;padding:18px 12px 40px;">
+        <button
+          id="machadoBackSupport"
+          style="
+            border:0;
+            background:none;
+            color:#374151;
+            font-weight:800;
+            cursor:pointer;
+            padding:8px 0;
+          "
+        >
+          ← Voltar para meus atendimentos
+        </button>
+
+        <section style="
+          margin-top:10px;
+          border:1px solid #e5e7eb;
+          border-radius:20px;
+          overflow:hidden;
+          background:#fff;
+        ">
+          <header style="
+            padding:18px;
+            border-bottom:1px solid #e5e7eb;
+            background:#f9fafb;
+          ">
+            <div style="font-size:12px;color:#6b7280;font-weight:800;">
+              CENTRAL DE SUPORTE
+            </div>
+
+            <h1 id="machadoGeneralChatTitle"
+                style="margin:4px 0;font-size:20px;">
+              💬 Atendimento
+            </h1>
+
+            <p id="machadoGeneralChatInfo"
+               style="margin:0;color:#6b7280;font-size:13px;">
+              Conversa com a equipe Machado Express.
+            </p>
+          </header>
+
+          <div
+            id="machadoGeneralMessages"
+            style="
+              min-height:360px;
+              max-height:58vh;
+              overflow-y:auto;
+              padding:16px;
+              background:#f8fafc;
+            "
+          ></div>
+
+          <form
+            id="machadoGeneralForm"
+            style="
+              display:flex;
+              gap:8px;
+              padding:12px;
+              border-top:1px solid #e5e7eb;
+            "
+          >
+            <textarea
+              id="machadoGeneralInput"
+              rows="2"
+              placeholder="Digite sua dúvida ou explique o que precisa..."
+              style="
+                flex:1;
+                resize:none;
+                border:1px solid #d1d5db;
+                border-radius:12px;
+                padding:11px;
+              "
+            ></textarea>
+
+            <button
+              type="submit"
+              style="
+                align-self:flex-end;
+                border:0;
+                border-radius:12px;
+                padding:11px 16px;
+                background:#111827;
+                color:#fff;
+                font-weight:900;
+                cursor:pointer;
+              "
+            >
+              Enviar
+            </button>
+          </form>
+
+          <div id="machadoGeneralActions"
+               style="padding:0 12px 12px;"></div>
+        </section>
+      </main>
+    `;
+
+    document.getElementById("machadoBackSupport").onclick = () => {
+      location.hash = "#/suporte";
+    };
+
+    const messagesEl =
+      document.getElementById("machadoGeneralMessages");
+
+    async function load() {
+      try {
+        const data = await api(
+          `/api/me/support/general-chats/${Number(chatId)}/messages`
+        );
+
+        const chat = data.chat || {};
+        const messages = Array.isArray(data.messages)
+          ? data.messages
+          : [];
+
+        document.getElementById("machadoGeneralChatTitle").textContent =
+          `💬 Atendimento #${Number(chatId)}`;
+
+        document.getElementById("machadoGeneralChatInfo").textContent =
+          chat.assigned_admin_name
+            ? `Atendimento com ${chat.assigned_admin_name}`
+            : "Aguardando um membro da equipe Machado Express.";
+
+        messagesEl.innerHTML = messages.length
+          ? messages.map(m => {
+              const customer =
+                String(m.sender_role || "").toLowerCase() === "customer";
+
+              return `
+                <div style="
+                  display:flex;
+                  justify-content:${customer ? "flex-end" : "flex-start"};
+                  margin-bottom:12px;
+                ">
+                  <div style="
+                    max-width:82%;
+                    padding:10px 12px;
+                    border-radius:14px;
+                    background:${customer ? "#111827" : "#fff"};
+                    color:${customer ? "#fff" : "#111827"};
+                    border:1px solid ${customer ? "#111827" : "#e5e7eb"};
+                  ">
+                    <div style="
+                      font-size:11px;
+                      font-weight:900;
+                      margin-bottom:5px;
+                      opacity:.75;
+                    ">
+                      ${customer
+                        ? "👤 Você"
+                        : `🛠️ Atendimento · ${esc(m.sender_name || "Equipe")}`
+                      }
+                    </div>
+
+                    <div style="
+                      font-size:14px;
+                      line-height:1.5;
+                      white-space:pre-wrap;
+                    ">
+                      ${esc(m.message || "")}
+                    </div>
+
+                    <div style="
+                      margin-top:5px;
+                      font-size:10px;
+                      opacity:.6;
+                    ">
+                      ${esc(formatTime(m.created_at))}
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join("")
+          : `
+            <div style="
+              text-align:center;
+              color:#6b7280;
+              padding:70px 20px;
+            ">
+              <div style="font-size:40px;">👋</div>
+              <strong>Como podemos ajudar?</strong>
+              <p style="font-size:13px;">
+                Explique sua dúvida ou problema para nossa equipe.
+              </p>
+            </div>
+          `;
+
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+
+        const actions =
+          document.getElementById("machadoGeneralActions");
+
+        if (chat.status === "finalizado") {
+          actions.innerHTML = `
+            <button
+              id="machadoReopenGeneral"
+              style="
+                width:100%;
+                border:1px solid #d1d5db;
+                border-radius:12px;
+                background:#fff;
+                padding:11px;
+                font-weight:800;
+                cursor:pointer;
+              "
+            >
+              🔓 Reabrir atendimento
+            </button>
+          `;
+
+          document.getElementById("machadoReopenGeneral").onclick =
+            async () => {
+              try {
+                await api(
+                  `/api/me/support/general-chats/${Number(chatId)}/reopen`,
+                  { method:"POST" }
+                );
+
+                await load();
+              } catch (e) {
+                toast(e.message || "Não foi possível reabrir.", "warn");
+              }
+            };
+        } else {
+          actions.innerHTML = "";
+        }
+      } catch (e) {
+        messagesEl.innerHTML = `
+          <div style="padding:30px;text-align:center;color:#b91c1c;">
+            Não foi possível carregar esta conversa.
+          </div>
+        `;
+      }
+    }
+
+    document.getElementById("machadoGeneralForm").onsubmit =
+      async e => {
+        e.preventDefault();
+
+        const input =
+          document.getElementById("machadoGeneralInput");
+
+        const message = input.value.trim();
+
+        if (!message) return;
+
+        try {
+          await api(
+            `/api/me/support/general-chats/${Number(chatId)}/messages`,
+            {
+              method:"POST",
+              headers:{
+                "Content-Type":"application/json"
+              },
+              body:JSON.stringify({message})
+            }
+          );
+
+          input.value = "";
+          await load();
+        } catch (e) {
+          toast(e.message || "Não foi possível enviar.", "warn");
+        }
+      };
+
+    await load();
+
+    supportRefreshTimer = setInterval(() => {
+      if (!document.body.contains(app) || document.hidden) return;
+      load();
+    }, 5000);
+  }
+})();
+
 })();
 
 
@@ -2909,6 +3564,675 @@ window.supportAdminAction = async function(action, orderId) {
     alert("Não foi possível atualizar o atendimento: " + (e.message || e));
   }
 };
+
+
+// MACHADO_ADMIN_SUPORTE_GERAL_V1
+(() => {
+  const esc = (v) => String(v ?? "")
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
+
+  const statusInfo = (status) => {
+    const map = {
+      novo: ["Novo", "#fff7ed", "#c2410c"],
+      andamento: ["Em atendimento", "#eff6ff", "#1d4ed8"],
+      aguardando_cliente: ["Aguardando cliente", "#fefce8", "#a16207"],
+      finalizado: ["Finalizado", "#f0fdf4", "#15803d"]
+    };
+    return map[status] || [status || "Atendimento", "#f3f4f6", "#374151"];
+  };
+
+  const formatDate = (v) => {
+    if (!v) return "";
+    try {
+      return new Date(v).toLocaleString("pt-BR", {
+        day:"2-digit",
+        month:"2-digit",
+        hour:"2-digit",
+        minute:"2-digit"
+      });
+    } catch {
+      return v;
+    }
+  };
+
+  async function loadLists() {
+    const [orders, general] = await Promise.all([
+      api("/api/admin/support/chats"),
+      api("/api/admin/support/general-chats")
+    ]);
+
+    const orderChats = (orders?.chats || orders || []).map(x => ({
+      ...x,
+      _kind: "order",
+      _id: x.order_id,
+      _title: `Pedido #${x.order_id}`,
+      _customer: x.customer_name || x.user_name || x.name || "Cliente"
+    }));
+
+    const generalChats = (general?.chats || general || []).map(x => ({
+      ...x,
+      _kind: "general",
+      _id: x.id,
+      _title: "Suporte geral",
+      _customer: x.customer_name || x.user_name || x.name || "Cliente"
+    }));
+
+    return [...orderChats, ...generalChats]
+      .sort((a,b) => {
+        const ua = Number(a.unread_admin || 0);
+        const ub = Number(b.unread_admin || 0);
+        if (ub !== ua) return ub - ua;
+        return String(b.updated_at || "").localeCompare(String(a.updated_at || ""));
+      });
+  }
+
+  function normalizeTab(tab, chats) {
+    if (tab === "novos")
+      return chats.filter(x => x.status === "novo");
+
+    if (tab === "andamento")
+      return chats.filter(x => x.status === "andamento");
+
+    if (tab === "aguardando")
+      return chats.filter(x => x.status === "aguardando_cliente");
+
+    if (tab === "finalizados")
+      return chats.filter(x => x.status === "finalizado");
+
+    return chats;
+  }
+
+  async function messages(chat) {
+    const url = chat._kind === "general"
+      ? `/api/admin/support/general-chats/${chat._id}/messages`
+      : `/api/orders/${chat._id}/messages`;
+
+    const data = await api(url);
+    return data?.messages || data || [];
+  }
+
+  async function action(chat, name) {
+    let url = "";
+    let method = "POST";
+
+    if (chat._kind === "general") {
+      if (name === "assume")
+        url = `/api/admin/support/general-chats/${chat._id}/assume`;
+      if (name === "finalize")
+        url = `/api/admin/support/general-chats/${chat._id}/finalize`;
+      if (name === "reopen")
+        url = `/api/admin/support/general-chats/${chat._id}/reopen`;
+    } else {
+      if (name === "assume")
+        url = `/api/admin/support/${chat._id}/assume`;
+      if (name === "finalize")
+        url = `/api/admin/support/${chat._id}/finalize`;
+      if (name === "reopen")
+        url = `/api/admin/support/${chat._id}/reopen`;
+    }
+
+    if (!url) return;
+    await api(url, { method });
+  }
+
+  async function send(chat, message) {
+    const text = String(message || "").trim();
+    if (!text) return;
+
+    if (chat._kind === "general") {
+      await api(
+        `/api/admin/support/general-chats/${chat._id}/messages`,
+        {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({ message:text })
+        }
+      );
+    } else {
+      await api(
+        `/api/orders/${chat._id}/messages`,
+        {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({ message:text })
+        }
+      );
+    }
+  }
+
+  function renderMessages(list) {
+    if (!list.length) {
+      return `
+        <div style="
+          padding:35px;
+          text-align:center;
+          color:#6b7280;
+        ">
+          Nenhuma mensagem ainda.<br>
+          <small>Quando o cliente enviar algo, a conversa aparecerá aqui.</small>
+        </div>
+      `;
+    }
+
+    return list.map(m => {
+      const customer =
+        String(m.sender_role || "").toLowerCase() === "customer";
+
+      const sender = esc(
+        m.sender_name ||
+        (customer ? "Cliente" : "Atendimento")
+      );
+
+      return `
+        <div style="
+          display:flex;
+          justify-content:${customer ? "flex-start" : "flex-end"};
+          margin:10px 0;
+        ">
+          <div style="
+            max-width:78%;
+            padding:12px 14px;
+            border-radius:14px;
+            background:${customer ? "#f3f4f6" : "#e8f1ff"};
+            border:1px solid ${customer ? "#e5e7eb" : "#cfe0ff"};
+          ">
+            <div style="
+              font-size:12px;
+              font-weight:800;
+              margin-bottom:5px;
+              color:${customer ? "#374151" : "#1d4ed8"};
+            ">
+              ${customer ? "👤 Cliente" : "🛠️ Atendimento"} · ${sender}
+            </div>
+
+            <div style="
+              white-space:pre-wrap;
+              word-break:break-word;
+              color:#111827;
+              line-height:1.45;
+            ">${esc(m.message)}</div>
+
+            <div style="
+              margin-top:6px;
+              font-size:10px;
+              color:#9ca3af;
+            ">${formatDate(m.created_at)}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  window.machadoAdminSupport = async function() {
+    let chats = [];
+    let active = null;
+    let activeTab = "todos";
+    let poll = null;
+
+    const render = async () => {
+      chats = await loadLists();
+      const visible = normalizeTab(activeTab, chats);
+
+      if (active) {
+        const refreshed = chats.find(
+          x => x._kind === active._kind && x._id === active._id
+        );
+        if (refreshed) active = refreshed;
+      }
+
+      const root = document.querySelector("#app");
+      if (!root) return;
+
+      const tabs = [
+        ["todos","Todos"],
+        ["novos","Novos"],
+        ["andamento","Em atendimento"],
+        ["aguardando","Aguardando cliente"],
+        ["finalizados","Finalizados"]
+      ];
+
+      root.innerHTML = `
+        <section style="
+          max-width:1400px;
+          margin:0 auto;
+          padding:18px;
+        ">
+          <div style="
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:12px;
+            margin-bottom:16px;
+            flex-wrap:wrap;
+          ">
+            <div>
+              <h1 style="margin:0 0 5px">🎧 Central de Suporte</h1>
+              <div style="color:#6b7280">
+                Atendimento por pedido e suporte geral em um único painel.
+              </div>
+            </div>
+
+            <button id="supportAdminRefresh"
+              style="
+                border:1px solid #d1d5db;
+                background:white;
+                border-radius:10px;
+                padding:10px 14px;
+                cursor:pointer;
+                font-weight:700;
+              ">
+              ↻ Atualizar
+            </button>
+          </div>
+
+          <div style="
+            display:flex;
+            gap:7px;
+            overflow:auto;
+            margin-bottom:15px;
+            padding-bottom:4px;
+          ">
+            ${tabs.map(([id,label]) => `
+              <button
+                data-support-tab="${id}"
+                style="
+                  white-space:nowrap;
+                  border:1px solid ${activeTab===id ? "#2563eb" : "#d1d5db"};
+                  background:${activeTab===id ? "#eff6ff" : "white"};
+                  color:${activeTab===id ? "#1d4ed8" : "#374151"};
+                  border-radius:999px;
+                  padding:9px 13px;
+                  cursor:pointer;
+                  font-weight:700;
+                ">
+                ${label}
+                <span style="
+                  display:inline-block;
+                  margin-left:5px;
+                  color:#6b7280;
+                ">${normalizeTab(id,chats).length}</span>
+              </button>
+            `).join("")}
+          </div>
+
+          <div style="
+            display:grid;
+            grid-template-columns:minmax(280px,390px) minmax(0,1fr);
+            gap:14px;
+            min-height:620px;
+          ">
+            <aside style="
+              border:1px solid #e5e7eb;
+              border-radius:14px;
+              background:white;
+              overflow:auto;
+            ">
+              ${
+                visible.length
+                ? visible.map(c => {
+                    const [label,bg,color] = statusInfo(c.status);
+                    const selected =
+                      active &&
+                      active._kind===c._kind &&
+                      active._id===c._id;
+
+                    return `
+                      <button
+                        data-chat-kind="${c._kind}"
+                        data-chat-id="${c._id}"
+                        style="
+                          display:block;
+                          width:100%;
+                          text-align:left;
+                          border:0;
+                          border-bottom:1px solid #f0f0f0;
+                          background:${selected ? "#f8fafc" : "white"};
+                          padding:14px;
+                          cursor:pointer;
+                        ">
+                        <div style="
+                          display:flex;
+                          justify-content:space-between;
+                          gap:8px;
+                        ">
+                          <strong>${esc(c._title)}</strong>
+                          ${
+                            Number(c.unread_admin||0) > 0
+                            ? `<span style="
+                                background:#dc2626;
+                                color:white;
+                                min-width:21px;
+                                height:21px;
+                                border-radius:999px;
+                                display:inline-flex;
+                                align-items:center;
+                                justify-content:center;
+                                font-size:11px;
+                              ">${Number(c.unread_admin||0)}</span>`
+                            : ""
+                          }
+                        </div>
+
+                        <div style="
+                          margin-top:5px;
+                          font-size:13px;
+                          color:#374151;
+                        ">
+                          👤 ${esc(c._customer)}
+                        </div>
+
+                        <div style="
+                          display:flex;
+                          justify-content:space-between;
+                          align-items:center;
+                          gap:8px;
+                          margin-top:8px;
+                        ">
+                          <span style="
+                            background:${bg};
+                            color:${color};
+                            padding:4px 8px;
+                            border-radius:999px;
+                            font-size:11px;
+                            font-weight:800;
+                          ">${label}</span>
+
+                          <small style="color:#9ca3af">
+                            ${formatDate(c.updated_at)}
+                          </small>
+                        </div>
+                      </button>
+                    `;
+                  }).join("")
+                : `
+                  <div style="
+                    padding:35px 20px;
+                    text-align:center;
+                    color:#6b7280;
+                  ">
+                    Nenhum atendimento nesta aba.
+                  </div>
+                `
+              }
+            </aside>
+
+            <main id="machadoAdminChat" style="
+              border:1px solid #e5e7eb;
+              border-radius:14px;
+              background:white;
+              display:flex;
+              flex-direction:column;
+              min-width:0;
+            ">
+              ${
+                active
+                ? `
+                  <div style="
+                    padding:15px;
+                    border-bottom:1px solid #e5e7eb;
+                  ">
+                    <div style="
+                      display:flex;
+                      justify-content:space-between;
+                      gap:10px;
+                      align-items:flex-start;
+                      flex-wrap:wrap;
+                    ">
+                      <div>
+                        <h2 style="margin:0 0 5px">
+                          ${esc(active._title)}
+                        </h2>
+                        <div style="color:#6b7280;font-size:14px">
+                          👤 Cliente: <strong>${esc(active._customer)}</strong>
+                        </div>
+                      </div>
+
+                      <div style="
+                        display:flex;
+                        gap:7px;
+                        flex-wrap:wrap;
+                      ">
+                        ${
+                          active.status !== "finalizado"
+                          ? `
+                            <button data-action="assume"
+                              style="
+                                border:0;
+                                background:#2563eb;
+                                color:white;
+                                border-radius:9px;
+                                padding:9px 12px;
+                                cursor:pointer;
+                                font-weight:800;
+                              ">
+                              👋 Assumir
+                            </button>
+
+                            <button data-action="finalize"
+                              style="
+                                border:0;
+                                background:#15803d;
+                                color:white;
+                                border-radius:9px;
+                                padding:9px 12px;
+                                cursor:pointer;
+                                font-weight:800;
+                              ">
+                              ✓ Finalizar
+                            </button>
+                          `
+                          : `
+                            <button data-action="reopen"
+                              style="
+                                border:0;
+                                background:#2563eb;
+                                color:white;
+                                border-radius:9px;
+                                padding:9px 12px;
+                                cursor:pointer;
+                                font-weight:800;
+                              ">
+                              ↻ Reabrir
+                            </button>
+                          `
+                        }
+                      </div>
+                    </div>
+                  </div>
+
+                  <div id="machadoAdminMessages"
+                    style="
+                      flex:1;
+                      overflow:auto;
+                      padding:14px;
+                      min-height:390px;
+                    ">
+                    Carregando...
+                  </div>
+
+                  ${
+                    active.status !== "finalizado"
+                    ? `
+                      <form id="machadoAdminSend"
+                        style="
+                          border-top:1px solid #e5e7eb;
+                          padding:12px;
+                          display:flex;
+                          gap:8px;
+                        ">
+                        <textarea id="machadoAdminInput"
+                          rows="2"
+                          placeholder="Digite a resposta para o cliente..."
+                          style="
+                            flex:1;
+                            resize:none;
+                            border:1px solid #d1d5db;
+                            border-radius:10px;
+                            padding:10px;
+                            font:inherit;
+                          "></textarea>
+
+                        <button
+                          style="
+                            align-self:flex-end;
+                            border:0;
+                            background:#111827;
+                            color:white;
+                            border-radius:10px;
+                            padding:11px 15px;
+                            cursor:pointer;
+                            font-weight:800;
+                          ">
+                          Enviar
+                        </button>
+                      </form>
+                    `
+                    : `
+                      <div style="
+                        border-top:1px solid #e5e7eb;
+                        padding:13px;
+                        color:#6b7280;
+                        text-align:center;
+                      ">
+                        Atendimento finalizado. Reabra para continuar a conversa.
+                      </div>
+                    `
+                  }
+                `
+                : `
+                  <div style="
+                    margin:auto;
+                    padding:40px;
+                    text-align:center;
+                    color:#6b7280;
+                  ">
+                    <div style="font-size:42px">🎧</div>
+                    <h2 style="color:#111827">
+                      Selecione um atendimento
+                    </h2>
+                    <p>
+                      Escolha uma conversa à esquerda para visualizar o histórico
+                      e responder ao cliente.
+                    </p>
+                  </div>
+                `
+              }
+            </main>
+          </div>
+        </section>
+      `;
+
+      root.querySelectorAll("[data-support-tab]").forEach(btn => {
+        btn.onclick = async () => {
+          activeTab = btn.dataset.supportTab;
+          await render();
+        };
+      });
+
+      root.querySelectorAll("[data-chat-kind]").forEach(btn => {
+        btn.onclick = async () => {
+          active = chats.find(c =>
+            c._kind === btn.dataset.chatKind &&
+            String(c._id) === String(btn.dataset.chatId)
+          ) || null;
+
+          await render();
+          await loadActiveMessages();
+        };
+      });
+
+      const refreshBtn = root.querySelector("#supportAdminRefresh");
+      if (refreshBtn) {
+        refreshBtn.onclick = render;
+      }
+
+      root.querySelectorAll("[data-action]").forEach(btn => {
+        btn.onclick = async () => {
+          await action(active, btn.dataset.action);
+          await render();
+          if (active) await loadActiveMessages();
+        };
+      });
+
+      const form = root.querySelector("#machadoAdminSend");
+      if (form) {
+        form.onsubmit = async (ev) => {
+          ev.preventDefault();
+
+          const input = root.querySelector("#machadoAdminInput");
+          const value = input?.value || "";
+
+          if (!value.trim()) return;
+
+          input.disabled = true;
+
+          try {
+            await send(active, value);
+            input.value = "";
+            await render();
+            await loadActiveMessages();
+          } finally {
+            input.disabled = false;
+            input.focus();
+          }
+        };
+      }
+
+      await loadActiveMessages();
+    };
+
+    const loadActiveMessages = async () => {
+      if (!active) return;
+
+      const box = document.querySelector("#machadoAdminMessages");
+      if (!box) return;
+
+      try {
+        const list = await messages(active);
+        box.innerHTML = renderMessages(list);
+        box.scrollTop = box.scrollHeight;
+      } catch (e) {
+        box.innerHTML = `
+          <div style="padding:20px;color:#b91c1c">
+            Erro ao carregar mensagens: ${esc(e.message)}
+          </div>
+        `;
+      }
+    };
+
+    await render();
+
+    clearInterval(poll);
+    poll = setInterval(async () => {
+      try {
+        const fresh = await loadLists();
+
+        if (!active) {
+          chats = fresh;
+          return;
+        }
+
+        const current = fresh.find(x =>
+          x._kind===active._kind &&
+          x._id===active._id
+        );
+
+        if (current) {
+          active = current;
+          chats = fresh;
+          await loadActiveMessages();
+        }
+      } catch {}
+    }, 5000);
+  };
+
+  window.adminSupport = window.machadoAdminSupport;
+})();
+
 
 window.adminSupport = async function() {
   if (!store.user || !["super_admin","admin","gerente","atendente"].includes(store.user.role)) {
