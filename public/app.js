@@ -2261,3 +2261,231 @@ window.openCustomerDetailsModal = async function(id) {
     `;
   } catch(err) { alert("Erro ao abrir ficha do cliente."); closeModal(); }
 };
+
+
+// MODAL DE SUPORTE DO PEDIDO (2 OPÇÕES)
+window.openOrderSupportModal = function(orderId, total, status) {
+  const old = document.getElementById("order-support-modal");
+  if (old) old.remove();
+
+  const modal = document.createElement("div");
+  modal.id = "order-support-modal";
+  modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(6px);z-index:999999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;";
+
+  const whatsappMsg = encodeURIComponent("Olá! Gostaria de enviar o comprovante / falar sobre financeiro do Pedido #" + orderId + " (" + total + ").");
+  const whatsappUrl = "https://wa.me/5551981884111?text=" + whatsappMsg;
+
+  modal.innerHTML = `
+    <div style="background:linear-gradient(145deg,#0c1322 0%,#090e1a 100%);border:1px solid #22d3ee;box-shadow:0 12px 35px rgba(0,0,0,.9),0 0 25px rgba(34,211,238,.35);border-radius:18px;max-width:480px;width:100%;padding:22px;box-sizing:border-box;color:#fff;position:relative;">
+      <button type="button" onclick="document.getElementById('order-support-modal').remove()" style="position:absolute;top:14px;right:14px;background:rgba(255,255,255,0.1);border:none;color:#cbd5e1;font-size:16px;width:32px;height:32px;border-radius:50%;cursor:pointer;font-weight:bold;">✕</button>
+      
+      <div style="text-align:center;margin-bottom:18px;">
+        <span style="font-size:28px;">🎧</span>
+        <h3 style="font-size:19px;margin:6px 0 2px;color:#fff;">Suporte do Pedido #${orderId}</h3>
+        <p style="font-size:13px;color:#94a3b8;margin:0;">Escolha o canal de atendimento para este pedido:</p>
+      </div>
+
+      <!-- OPÇÃO 1: CHAT ONLINE NO SITE -->
+      <div style="background:rgba(15,23,42,0.8);border:1px solid rgba(56,189,248,0.3);border-radius:14px;padding:15px;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+          <span style="font-size:22px;">💬</span>
+          <b style="color:#38bdf8;font-size:15px;">1. Suporte & Dúvidas (Chat no Site)</b>
+        </div>
+        <p style="font-size:12px;color:#cbd5e1;line-height:1.4;margin:0 0 12px;">
+          Dúvidas sobre o produto, entrega, especificações e acompanhamento. Converse diretamente com o suporte aqui na loja.
+        </p>
+        <button type="button" onclick="document.getElementById('order-support-modal').remove();openOrderChatModal(${orderId})" style="width:100%;background:linear-gradient(135deg,#06b6d4,#0284c7);color:#fff;border:none;padding:11px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 0 12px rgba(6,182,212,.4);">
+          <span>💬</span> Abrir Chat do Pedido
+        </button>
+      </div>
+
+      <!-- OPÇÃO 2: WHATSAPP (COMPROVANTES E FINANCEIRO) -->
+      <div style="background:rgba(15,23,42,0.8);border:1px solid rgba(37,211,102,0.3);border-radius:14px;padding:15px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+          <span style="font-size:22px;">🟢</span>
+          <b style="color:#4ade80;font-size:15px;">2. Comprovantes & Pagamento (WhatsApp)</b>
+        </div>
+        <p style="font-size:12px;color:#cbd5e1;line-height:1.4;margin:0 0 12px;">
+          Envio de comprovante Pix para liberação imediata e assuntos financeiros via WhatsApp.
+        </p>
+        <a href="${whatsappUrl}" target="_blank" rel="noopener noreferrer" style="width:100%;box-sizing:border-box;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;padding:11px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;box-shadow:0 0 12px rgba(37,211,102,.4);">
+          <span>📲</span> Chamar no WhatsApp Oficial
+        </a>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+};
+
+// JANELA DE CHAT ONLINE EM TEMPO REAL
+window.openOrderChatModal = async function(orderId) {
+  const old = document.getElementById("order-chat-modal");
+  if (old) old.remove();
+
+  const modal = document.createElement("div");
+  modal.id = "order-chat-modal";
+  modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(6px);z-index:999999;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;";
+
+  modal.innerHTML = `
+    <div style="background:linear-gradient(145deg,#0c1322 0%,#090e1a 100%);border:1px solid #22d3ee;box-shadow:0 12px 35px rgba(0,0,0,.9);border-radius:16px;max-width:520px;width:100%;height:85vh;max-height:600px;display:flex;flex-direction:column;overflow:hidden;position:relative;">
+      <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;background:rgba(15,23,42,0.8);">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:22px;">💬</span>
+          <div>
+            <b style="color:#fff;font-size:15px;display:block;">Atendimento · Pedido #${orderId}</b>
+            <small style="color:#38bdf8;font-size:11px;">Suporte Machado Express</small>
+          </div>
+        </div>
+        <button type="button" onclick="clearInterval(window.__chatTimer);document.getElementById('order-chat-modal').remove()" style="background:rgba(255,255,255,0.1);border:none;color:#cbd5e1;font-size:15px;width:30px;height:30px;border-radius:50%;cursor:pointer;">✕</button>
+      </div>
+
+      <div id="order-chat-messages" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:#060a12;">
+        <div style="text-align:center;color:#64748b;font-size:12px;margin:auto;">Carregando mensagens...</div>
+      </div>
+
+      <form id="order-chat-form" onsubmit="sendOrderChatMessage(event, ${orderId})" style="padding:12px;border-top:1px solid rgba(255,255,255,0.1);background:rgba(15,23,42,0.9);display:flex;gap:8px;">
+        <input id="order-chat-input" placeholder="Digite sua mensagem sobre o pedido..." autocomplete="off" style="flex:1;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 14px;color:#fff;font-size:13px;outline:none;">
+        <button type="submit" style="background:#06b6d4;border:none;color:#041019;font-weight:bold;padding:10px 16px;border-radius:10px;font-size:13px;cursor:pointer;">Enviar</button>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  async function loadMsgs() {
+    try {
+      const res = await fetch("/api/orders/" + orderId + "/messages");
+      const data = await res.json();
+      const container = document.getElementById("order-chat-messages");
+      if (!container) return;
+      if (!data.messages || data.messages.length === 0) {
+        container.innerHTML = '<div style="text-align:center;color:#94a3b8;font-size:12px;margin:auto;padding:20px;">Nenhuma mensagem ainda.<br>Envie sua dúvida abaixo e nosso suporte responderá aqui!</div>';
+        return;
+      }
+      container.innerHTML = data.messages.map(m => {
+        const isAdmin = m.sender_role === "admin";
+        const align = isAdmin ? "flex-start" : "flex-end";
+        const bg = isAdmin ? "rgba(34,211,238,0.15)" : "linear-gradient(135deg,#0284c7,#0369a1)";
+        const border = isAdmin ? "1px solid rgba(34,211,238,0.3)" : "none";
+        const roleLabel = isAdmin ? "🎧 Suporte Machado Express" : "👤 Você";
+        return `
+          <div style="align-self:${align};max-width:82%;background:${bg};border:${border};border-radius:12px;padding:10px 12px;color:#fff;font-size:13px;">
+            <div style="font-size:11px;color:${isAdmin?'#38bdf8':'#93c5fd'};font-weight:bold;margin-bottom:3px;">${roleLabel}</div>
+            <div style="line-height:1.4;word-break:break-word;">${esc(m.message)}</div>
+            <div style="font-size:10px;color:#94a3b8;text-align:right;margin-top:4px;">${esc((m.created_at||'').slice(11,16))}</div>
+          </div>
+        `;
+      }).join("");
+      container.scrollTop = container.scrollHeight;
+    } catch(e) {}
+  }
+
+  loadMsgs();
+  clearInterval(window.__chatTimer);
+  window.__chatTimer = setInterval(loadMsgs, 4000);
+};
+
+window.sendOrderChatMessage = async function(e, orderId) {
+  e.preventDefault();
+  const input = document.getElementById("order-chat-input");
+  const msg = (input.value || "").trim();
+  if (!msg) return;
+  input.value = "";
+  try {
+    await api("/api/orders/" + orderId + "/messages", {
+      method: "POST",
+      body: JSON.stringify({ message: msg })
+    });
+    const container = document.getElementById("order-chat-messages");
+    if (container) {
+      container.innerHTML += `
+        <div style="align-self:flex-end;max-width:82%;background:linear-gradient(135deg,#0284c7,#0369a1);border-radius:12px;padding:10px 12px;color:#fff;font-size:13px;">
+          <div style="font-size:11px;color:#93c5fd;font-weight:bold;margin-bottom:3px;">👤 Você</div>
+          <div style="line-height:1.4;word-break:break-word;">${esc(msg)}</div>
+        </div>
+      `;
+      container.scrollTop = container.scrollHeight;
+    }
+  } catch(err) {
+    alert("Erro ao enviar: " + (err.message || err));
+  }
+};
+
+// PAINEL ADMIN: ABA DE ATENDIMENTO E CHAT
+async function adminSupport() {
+  if (!store.user || !['super_admin','admin','gerente','atendente'].includes(store.user.role)) {
+    location.hash = '#/login';
+    return;
+  }
+  let chats = [];
+  try {
+    chats = await api('/api/admin/support/chats');
+  } catch(e) {
+    chats = [];
+  }
+
+  const items = Array.isArray(chats) && chats.length ? chats.map(c => `
+    <article style="background:linear-gradient(145deg,#0c1322 0%,#090e1a 100%);border:1px solid rgba(56,189,248,.25);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 4px 15px rgba(0,0,0,.4);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <b style="color:#fff;font-size:16px;">Pedido #${esc(c.id)}</b>
+            <span style="font-size:11px;padding:2px 8px;border-radius:999px;background:rgba(34,211,238,.15);color:#38bdf8;font-weight:700;">${esc(c.status)}</span>
+          </div>
+          <div style="margin-top:6px;font-size:13px;color:#cbd5e1;">
+            <strong>👤 ${esc(c.customer_name || 'Cliente')}</strong> · <span>📱 ${esc(c.customer_phone || 'Sem fone')}</span>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <strong style="color:#38bdf8;font-size:16px;">${typeof money === 'function' ? money(c.total) : ('R$ ' + c.total)}</strong>
+          <small style="display:block;color:#94a3b8;font-size:11px;">${esc(c.message_count || 0)} mensagens</small>
+        </div>
+      </div>
+      <div style="margin:12px 0;padding:10px 12px;background:rgba(15,23,42,.6);border-radius:10px;border:1px solid rgba(255,255,255,.06);font-size:13px;color:#94a3b8;">
+        <span style="color:#38bdf8;font-weight:bold;">Última mensagem:</span> ${esc(c.last_message || 'Nenhuma mensagem')}
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button type="button" onclick="openOrderChatModal(${Number(c.id)})" style="flex:1;min-width:140px;background:linear-gradient(135deg,#06b6d4,#0284c7);color:#fff;border:none;padding:10px 14px;border-radius:10px;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+          💬 Responder no Chat do Site
+        </button>
+        <a href="https://wa.me/${(c.customer_phone||'').replace(/\D/g,'')}?text=${encodeURIComponent('Olá ' + (c.customer_name||'') + '! Sou do suporte da Machado Express sobre seu Pedido #' + c.id)}" target="_blank" rel="noopener noreferrer" style="background:rgba(37,211,102,.12);border:1px solid #25d366;color:#4ade80;padding:10px 14px;border-radius:10px;font-weight:700;font-size:13px;text-decoration:none;display:flex;align-items:center;gap:6px;">
+          📲 WhatsApp do Cliente
+        </a>
+      </div>
+    </article>
+  `).join('') : `
+    <div style="text-align:center;padding:40px 20px;background:#0c1322;border:1px solid rgba(255,255,255,.1);border-radius:16px;color:#94a3b8;">
+      <span style="font-size:32px;display:block;margin-bottom:8px;">💬</span>
+      <h3 style="color:#fff;margin:0 0 6px;">Nenhum chamado de pedido em aberto</h3>
+      <p style="font-size:13px;margin:0;">Quando os clientes abrirem chat nos pedidos, as mensagens aparecerão aqui.</p>
+    </div>
+  `;
+
+  $('#app').innerHTML = `
+    <div class="admin-shell">
+      <aside class="admin-side">
+        <div class="admin-user-box">
+          <b>${esc(store.user.name)}</b>
+          <small>${esc(store.user.role)}</small>
+        </div>
+        <a href="#/admin">◈ Dashboard</a>
+        <a href="#/admin/produtos">▣ Produtos</a>
+        <a href="#/admin/pedidos">⌁ Pedidos</a>
+        <a href="#/admin/clientes">◎ Clientes</a>
+        <a href="#/admin/suporte" style="background:rgba(34,211,238,0.15);color:#38bdf8;font-weight:bold;">💬 Atendimento / Chat</a>
+        <a href="#/admin/equipe">◇ Equipe</a>
+        <a href="#/admin/posts">▤ Gerar posts</a>
+        <a href="#/admin/config">⚙ Configurações</a>
+        <button onclick="logout()">↪ Sair</button>
+      </aside>
+      <main class="admin-main">
+        <div class="panel-head" style="margin-bottom:16px;">
+          <div>
+            <span style="color:#38bdf8;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;">CENTRAL DE ATENDIMENTO</span>
+            <h2 style="font-size:22px;color:#fff;margin:2px 0 0;">Chat dos Pedidos</h2>
+          </div>
+        </div>
+        ${items}
+      </main>
+    </div>
+  `;
+}

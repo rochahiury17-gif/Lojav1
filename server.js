@@ -193,7 +193,15 @@ try { db.exec("ALTER TABLE products ADD COLUMN sort_order INTEGER DEFAULT 0;"); 
 try { db.exec("ALTER TABLE products ADD COLUMN images TEXT DEFAULT '[]';"); } catch(e) {}
 try { db.exec("UPDATE products SET sort_order = id WHERE sort_order = 0 OR sort_order IS NULL;"); } catch(e) {}
 
-db.exec(`CREATE TABLE IF NOT EXISTS order_stock_deductions (order_id INTEGER PRIMARY KEY, deducted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE)`);
+db.exec(`CREATE TABLE IF NOT EXISTS order_stock_deductions (order_id INTEGER PRIMARY KEY, deducted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS order_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id INTEGER NOT NULL,
+  sender_role TEXT NOT NULL,
+  sender_name TEXT NOT NULL,
+  message TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+)`);
 
 
 // PERSISTENCIA DE CONFIGURACOES EM ARQUIVO
@@ -971,6 +979,52 @@ app.post("/api/admin/posts/remove-bg",manager,async(req,res)=>{
 app.get("/api/admin/logs",admin,(req,res)=>res.json(db.prepare(`SELECT l.*,u.name user_name FROM audit_logs l LEFT JOIN users u ON u.id=l.user_id ORDER BY l.id DESC LIMIT 200`).all()));
 
 app.get("*",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
+
+
+// ROTAS DE CHAT E SUPORTE DO PEDIDO
+app.get("/api/orders/:id/messages", auth, (req, res) => {
+  const u = currentUser(req);
+  const orderId = Number(req.params.id);
+  const order = db.prepare("SELECT * FROM orders WHERE id=?").get(orderId);
+  if (!order) return res.status(404).json({ error: "Pedido não encontrado." });
+  const isAdmin = ADMIN_ROLES.has(u.role);
+  if (!isAdmin && order.user_id !== u.id) return res.status(403).json({ error: "Acesso negado." });
+  const msgs = db.prepare("SELECT * FROM order_messages WHERE order_id=? ORDER BY id ASC").all(orderId);
+  res.json({ order, messages: msgs });
+});
+
+app.post("/api/orders/:id/messages", auth, (req, res) => {
+  const u = currentUser(req);
+  const orderId = Number(req.params.id);
+  const msg = (req.body.message || "").trim();
+  if (!msg) return res.status(400).json({ error: "Mensagem vazia." });
+  const order = db.prepare("SELECT * FROM orders WHERE id=?").get(orderId);
+  if (!order) return res.status(404).json({ error: "Pedido não encontrado." });
+  const isAdmin = ADMIN_ROLES.has(u.role);
+  if (!isAdmin && order.user_id !== u.id) return res.status(403).json({ error: "Acesso negado." });
+  const role = isAdmin ? "admin" : "customer";
+  const name = u.name || (isAdmin ? "Suporte" : "Cliente");
+  const ins = db.prepare("INSERT INTO order_messages (order_id, sender_role, sender_name, message) VALUES (?, ?, ?, ?)").run(orderId, role, name, msg);
+  res.json({ ok: true, id: ins.lastInsertRowid });
+});
+
+app.get("/api/admin/support/chats", admin, (req, res) => {
+  try {
+    const list = db.prepare(`
+      SELECT o.id, o.customer_name, o.customer_phone, o.total, o.status,
+             (SELECT message FROM order_messages WHERE order_id=o.id ORDER BY id DESC LIMIT 1) as last_message,
+             (SELECT created_at FROM order_messages WHERE order_id=o.id ORDER BY id DESC LIMIT 1) as last_message_at,
+             COUNT(m.id) as message_count
+      FROM orders o
+      JOIN order_messages m ON m.order_id = o.id
+      GROUP BY o.id
+      ORDER BY last_message_at DESC
+    `).all();
+    res.json(list);
+  } catch(e) {
+    res.json([]);
+  }
+});
 
 app.listen(PORT, () => {
   console.log();
