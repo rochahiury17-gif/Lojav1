@@ -402,27 +402,26 @@ function bannerMarkup() {
     </section>`;
 }
 function productCard(p){
-  const imgHtml = p.image ? `<img src="${esc(p.image)}" alt="${esc(p.name)}">` : `<span>◈</span>`;
-  const tagDestaque = p.featured ? `<label>DESTAQUE</label>` : '';
+  const imgHtml = p.image ? `<img src="${esc(p.image)}" alt="${esc(p.name)}" style="width:100%;height:100%;object-fit:cover;display:block;">` : `<span style="font-size:32px;">◈</span>`;
+  const tagDestaque = p.featured ? `<label style="position:absolute;top:8px;left:8px;background:#0284c7;color:#fff;padding:4px 7px;border-radius:6px;font-size:9px;font-weight:900;">DESTAQUE</label>` : '';
   const estoque = Number(p.stock ?? 0);
   const semEstoque = estoque <= 0;
-  const tagEstoque = semEstoque ? `<label style="position:absolute;top:10px;right:10px;background:#ef4444;color:#fff;padding:5px 8px;border-radius:6px;font-size:9px;font-weight:900;">ESGOTADO</label>` : '';
-  const textoEstoque = semEstoque ? 'Esgotado' : `Em estoque: ${estoque} un.`;
+  const tagEstoque = semEstoque ? `<label style="position:absolute;top:8px;right:8px;background:#ef4444;color:#fff;padding:4px 7px;border-radius:6px;font-size:9px;font-weight:900;">ESGOTADO</label>` : '';
+  const textoEstoque = semEstoque ? 'Esgotado' : `Estoque: ${estoque} un.`;
   const corEstoque = semEstoque ? '#ef4444' : '#22c55e';
   const pJson = JSON.stringify(p).replace(/'/g, "&#39;");
-  return `<article class="product-card">
-    <div class="product-image" onclick='quickView(${pJson})' style="cursor:pointer;">
+  return `<article class="product-card" style="display:flex;flex-direction:column;height:100%;background:#0c1322;border:1px solid rgba(255,255,255,0.08);border-radius:14px;overflow:hidden;">
+    <div class="product-image" onclick="location.hash='#/produto/${p.id}'" style="cursor:pointer;position:relative;width:100%;aspect-ratio:1/1;background:#04070d;display:flex;align-items:center;justify-content:center;">
       ${imgHtml}
       ${tagDestaque}${tagEstoque}
     </div>
-    <div class="product-body">
-      <small>${esc(p.category_name||"Produto")}</small>
-      <h3 onclick='quickView(${pJson})' style="cursor:pointer;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;display:-webkit-box!important;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-height:1.25;min-height:2.5em;word-break:break-word;">${esc(p.name)}</h3>
-      <p>${esc(p.description||"Produto selecionado para você.")}</p>
-      <small style="display:block;margin:0 0 8px;color:${corEstoque};font-size:12px;font-weight:700;">${textoEstoque}</small>
-      <div class="product-bottom">
-        <strong>${money(p.price)}</strong>
-        <button class="add-btn" ${semEstoque?'disabled aria-disabled="true"':''} onclick='addCart(${pJson},event)'>${semEstoque?'Esgotado':'Adicionar <b>+</b>'}</button>
+    <div class="product-body" style="display:flex;flex-direction:column;flex:1;padding:12px;">
+      <small style="color:#38bdf8;font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:4px;">${esc(p.category_name||"Geral")}</small>
+      <h3 onclick="location.hash='#/produto/${p.id}'" style="cursor:pointer;margin:0 0 6px;color:#fff;font-size:13px;line-height:1.35;height:2.7em;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;word-break:break-word;">${esc(p.name)}</h3>
+      <small style="display:block;margin-bottom:8px;color:${corEstoque};font-size:11px;font-weight:700;">${textoEstoque}</small>
+      <div class="product-bottom" style="margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);">
+        <strong style="color:#fff;font-size:15px;">${money(p.price)}</strong>
+        <button class="add-btn" ${semEstoque?'disabled aria-disabled="true"':''} onclick='addCart(${pJson},event)' style="background:linear-gradient(135deg,#06b6d4,#0284c7);color:#041019;border:none;border-radius:8px;padding:7px 12px;font-weight:800;font-size:11px;cursor:pointer;">${semEstoque?'Esgotado':'Adicionar +'}</button>
       </div>
     </div>
   </article>`;
@@ -2184,11 +2183,11 @@ function setupFloatingWhatsApp() {
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     setupFloatingWhatsApp();
-    startAdminOrderMonitor();
+    // startAdminOrderMonitor();
   });
 } else {
   setupFloatingWhatsApp();
-  startAdminOrderMonitor();
+  // startAdminOrderMonitor();
 }
 
 
@@ -2813,29 +2812,230 @@ window.renderAccount = async function(subTab = 'pedidos') {
 
 // --- MODULO DE SUPORTE ADMIN FORÇADO ---
 
+
 window.adminSupport = async function() {
+  if (!store.user || !['super_admin','admin','gerente','atendente'].includes(store.user.role)) {
+    location.hash = '#/login';
+    return;
+  }
   let chats = [];
   try {
-    const res = await api("/api/admin/support/chats");
-    chats = await res.json();
-  } catch(e) { chats = []; }
+    const res = await api('/api/admin/support/chats');
+    chats = Array.isArray(res) ? res : [];
+  } catch(e) {
+    chats = [];
+  }
 
-  const content = Array.isArray(chats) && chats.length ? chats.map(c => `
-    <div style="background:#0c1322;border:1px solid rgba(56,189,248,0.3);padding:16px;border-radius:12px;margin-bottom:12px;color:#fff;">
-      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-        <b>Pedido #${c.id} - ${c.customer_name || "Cliente"}</b>
-        <span style="color:#38bdf8;">R$ ${c.total}</span>
-      </div>
-      <p style="color:#94a3b8;font-size:13px;margin-bottom:12px;">Status: ${c.status || "Pendente"}</p>
-      <button onclick="window.location.hash=#/admin/pedidos" style="background:#06b6d4;color:#fff;border:none;padding:8px 14px;border-radius:8px;font-weight:bold;cursor:pointer;width:100%;">Gerenciar Pedido e Chat</button>
-    </div>
-  `).join("") : `<div style="text-align:center;padding:30px;color:#94a3b8;">Nenhum atendimento no momento.</div>`;
+  window.__adminChatsCache = chats;
 
-  document.getElementById("app").innerHTML = `
-    <div style="max-width:800px;margin:20px auto;padding:16px;color:#fff;">
-      <h2>Central de Atendimento</h2>
-      <a href="#/admin" style="color:#38bdf8;display:inline-block;margin-bottom:16px;">← Voltar ao Admin</a>
-      ${content}
+  const renderChatList = (filterTerm = '', statusFilter = 'todos') => {
+    let list = window.__adminChatsCache || [];
+    if (filterTerm) {
+      const term = filterTerm.toLowerCase();
+      list = list.filter(c => 
+        String(c.id).includes(term) ||
+        String(c.customer_name || '').toLowerCase().includes(term) ||
+        String(c.customer_phone || '').includes(term)
+      );
+    }
+    if (statusFilter === 'aguardando') {
+      list = list.filter(c => c.last_sender !== 'admin');
+    } else if (statusFilter === 'respondido') {
+      list = list.filter(c => c.last_sender === 'admin');
+    }
+
+    if (!list.length) {
+      return `
+        <div style="text-align:center;padding:40px 20px;background:#0c1322;border:1px solid rgba(255,255,255,0.08);border-radius:16px;color:#94a3b8;">
+          <span style="font-size:32px;display:block;margin-bottom:8px;">💬</span>
+          <h3 style="color:#fff;margin:0 0 6px;">Nenhum chamado encontrado</h3>
+          <p style="font-size:13px;margin:0;">Quando os clientes mandarem mensagens sobre os pedidos, eles aparecerão aqui.</p>
+        </div>
+      `;
+    }
+
+    return list.map(c => {
+      const waClean = (c.customer_phone || '').replace(/\D/g, '');
+      const waLink = waClean ? `https://wa.me/${waClean.startsWith('55') ? waClean : '55' + waClean}?text=${encodeURIComponent('Olá ' + (c.customer_name || 'Cliente') + '! Falamos do suporte da MachadoExpress sobre seu Pedido #' + c.id)}` : '';
+      return `
+        <article style="background:linear-gradient(145deg,#0c1322 0%,#090e1a 100%);border:1px solid rgba(56,189,248,.25);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 4px 15px rgba(0,0,0,.4);">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <b style="color:#fff;font-size:16px;">Pedido #${esc(c.id)}</b>
+                <span style="font-size:11px;padding:2px 8px;border-radius:999px;background:rgba(34,211,238,.15);color:#38bdf8;font-weight:700;">${esc(c.status || 'Pendente')}</span>
+              </div>
+              <div style="margin-top:6px;font-size:13px;color:#cbd5e1;">
+                <strong>👤 ${esc(c.customer_name || 'Cliente')}</strong> · <span>📱 ${esc(c.customer_phone || 'Sem telefone')}</span>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <strong style="color:#38bdf8;font-size:16px;">${typeof money === 'function' ? money(c.total) : ('R$ ' + c.total)}</strong>
+              <small style="display:block;color:#94a3b8;font-size:11px;">${esc(c.message_count || 0)} mensagens</small>
+            </div>
+          </div>
+          <div style="margin:12px 0;padding:10px 12px;background:rgba(15,23,42,.6);border-radius:10px;border:1px solid rgba(255,255,255,.06);font-size:13px;color:#94a3b8;">
+            <span style="color:#38bdf8;font-weight:bold;">Última mensagem:</span> ${esc(c.last_message || 'Nenhuma mensagem')}
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button type="button" onclick="openOrderChatModal(${Number(c.id)})" style="flex:1;min-width:140px;background:linear-gradient(135deg,#06b6d4,#0284c7);color:#fff;border:none;padding:10px 14px;border-radius:10px;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+              💬 Abrir Chat no Site
+            </button>
+            ${waLink ? `
+              <a href="${waLink}" target="_blank" rel="noopener noreferrer" style="background:rgba(37,211,102,.12);border:1px solid #25d366;color:#4ade80;padding:10px 14px;border-radius:10px;font-weight:700;font-size:13px;text-decoration:none;display:flex;align-items:center;gap:6px;">
+                📲 WhatsApp do Cliente
+              </a>
+            ` : ''}
+          </div>
+        </article>
+      `;
+    }).join('');
+  };
+
+  $('#app').innerHTML = `
+    <div class="admin-shell">
+      <aside class="admin-side">
+        <div class="admin-user-box">
+          <b>${esc(store.user.name)}</b>
+          <small>${esc(store.user.role)}</small>
+        </div>
+        <a href="#/admin">◈ Dashboard</a>
+        <a href="#/admin/produtos">▣ Produtos</a>
+        <a href="#/admin/pedidos">⌁ Pedidos</a>
+        <a href="#/admin/clientes">◎ Clientes</a>
+        <a href="#/admin/suporte" style="background:rgba(34,211,238,0.15);color:#38bdf8;font-weight:bold;">💬 Atendimento / Chat</a>
+        <a href="#/admin/equipe">◇ Equipe</a>
+        <a href="#/admin/posts">▤ Gerar posts</a>
+        <a href="#/admin/config">⚙ Configurações</a>
+        <button onclick="logout()">↪ Sair</button>
+      </aside>
+      <main class="admin-main">
+        <div class="panel-head" style="margin-bottom:16px;">
+          <div>
+            <span style="color:#38bdf8;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;">CENTRAL DE ATENDIMENTO</span>
+            <h2 style="font-size:22px;color:#fff;margin:2px 0 0;">Chat dos Pedidos</h2>
+          </div>
+        </div>
+
+        <div style="background:#0c1322;border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:14px;margin-bottom:16px;">
+          <input id="adminChatSearch" placeholder="🔍 Buscar por Nº do pedido, nome do cliente ou telefone..." style="width:100%;box-sizing:border-box;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 14px;color:#fff;font-size:13px;outline:none;" oninput="document.getElementById('adminChatListContainer').innerHTML = renderChatList(this.value, document.querySelector('.chat-filter-btn.active')?.dataset.status || 'todos')">
+          <div style="display:flex;gap:8px;margin-top:10px;overflow-x:auto;">
+            <button type="button" class="chat-filter-btn active" data-status="todos" onclick="document.querySelectorAll('.chat-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('adminChatListContainer').innerHTML = renderChatList(document.getElementById('adminChatSearch').value, 'todos')" style="background:#0284c7;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">Todos</button>
+            <button type="button" class="chat-filter-btn" data-status="aguardando" onclick="document.querySelectorAll('.chat-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('adminChatListContainer').innerHTML = renderChatList(document.getElementById('adminChatSearch').value, 'aguardando')" style="background:rgba(255,255,255,0.06);color:#cbd5e1;border:1px solid rgba(255,255,255,0.1);padding:6px 12px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">Aguardando Resposta</button>
+            <button type="button" class="chat-filter-btn" data-status="respondido" onclick="document.querySelectorAll('.chat-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('adminChatListContainer').innerHTML = renderChatList(document.getElementById('adminChatSearch').value, 'respondido')" style="background:rgba(255,255,255,0.06);color:#cbd5e1;border:1px solid rgba(255,255,255,0.1);padding:6px 12px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">Respondidos</button>
+          </div>
+        </div>
+
+        <div id="adminChatListContainer">
+          ${renderChatList()}
+        </div>
+      </main>
     </div>
   `;
+};
+
+
+window.productDetail = async function(id) {
+  let p = null;
+  try {
+    const products = await api('/api/products');
+    p = products.find(x => Number(x.id) === Number(id));
+  } catch(e) {}
+  if (!p) {
+    $('#app').innerHTML = `<div class="container" style="text-align:center;padding:60px 20px;color:#94a3b8;"><h2>Produto não encontrado</h2><p>O produto pode ter sido removido ou o link está incorreto.</p><a href="#/" style="color:#38bdf8;font-weight:bold;">Voltar para a página inicial</a></div>`;
+    return;
+  }
+
+  let imgs = [];
+  if (p.images) {
+    try { imgs = typeof p.images === 'string' ? JSON.parse(p.images) : p.images; } catch(e) { imgs = []; }
+  }
+  if (!imgs.length && p.image) imgs = [p.image];
+  if (!imgs.length) imgs = ['/topo22.png'];
+  const mainImg = imgs[0];
+
+  const estoque = Number(p.stock ?? 0);
+  const semEstoque = estoque <= 0;
+  const pJson = JSON.stringify(p).replace(/'/g, "&#39;");
+
+  $('#app').innerHTML = `
+    <div class="container" style="max-width:960px;margin:20px auto;padding:12px;box-sizing:border-box;color:#fff;">
+      <div style="margin-bottom:14px;">
+        <a href="#/" style="color:#38bdf8;text-decoration:none;font-size:13px;font-weight:bold;display:inline-flex;align-items:center;gap:6px;">← Voltar para a loja</a>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;background:#0c1322;border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+        
+        <!-- FOTOS GRANDES -->
+        <div>
+          <div style="width:100%;aspect-ratio:1/1;background:#04070d;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;">
+            <img id="productDetailMainImg" src="${esc(mainImg)}" style="width:100%;height:100%;object-fit:contain;">
+          </div>
+          ${imgs.length > 1 ? `
+            <div style="display:flex;gap:10px;margin-top:12px;overflow-x:auto;padding-bottom:6px;">
+              ${imgs.map((img, i) => `
+                <img src="${esc(img)}" onclick="document.getElementById('productDetailMainImg').src='${esc(img)}';document.querySelectorAll('.p-thumb').forEach(t=>t.style.borderColor='rgba(255,255,255,0.1)');this.style.borderColor='#38bdf8';" class="p-thumb" style="width:64px;height:64px;object-fit:cover;background:#04070d;border-radius:10px;border:2px solid ${i===0?'#38bdf8':'rgba(255,255,255,0.1)'};cursor:pointer;flex-shrink:0;">
+              `).join('')}
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- INFORMAÇÕES E COMPRA -->
+        <div style="display:flex;flex-direction:column;">
+          <span style="color:#38bdf8;font-size:12px;font-weight:800;text-transform:uppercase;">${esc(p.category_name || 'MachadoExpress')}</span>
+          <h1 style="font-size:22px;line-height:1.3;margin:6px 0 10px;color:#fff;">${esc(p.name)}</h1>
+          
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+            <span style="padding:4px 10px;border-radius:999px;font-size:12px;font-weight:bold;background:${semEstoque?'rgba(239,68,68,0.15)':'rgba(34,197,94,0.15)'};color:${semEstoque?'#f87171':'#4ade80'};">● ${semEstoque?'Esgotado':`${estoque} unidades em estoque`}</span>
+          </div>
+
+          <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:16px;margin-bottom:18px;">
+            <div style="font-size:13px;color:#94a3b8;">Preço à vista:</div>
+            <div style="font-size:28px;font-weight:900;color:#38bdf8;margin:2px 0 6px;">${money(p.price)}</div>
+            <div style="font-size:12px;color:#34d399;font-weight:bold;">✓ Envio rápido com código de rastreamento</div>
+          </div>
+
+          <!-- SELETOR DE QUANTIDADE -->
+          <div style="margin-bottom:20px;">
+            <label style="display:block;font-size:12px;color:#94a3b8;font-weight:700;margin-bottom:8px;text-transform:uppercase;">Quantidade:</label>
+            <div style="display:inline-flex;align-items:center;gap:12px;background:#04070d;border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:6px 12px;">
+              <button type="button" onclick="let q=document.getElementById('pDetailQty');if(Number(q.innerText)>1)q.innerText=Number(q.innerText)-1;" style="background:none;border:none;color:#fff;font-size:18px;font-weight:bold;cursor:pointer;padding:0 6px;">−</button>
+              <strong id="pDetailQty" style="font-size:16px;min-width:24px;text-align:center;">1</strong>
+              <button type="button" onclick="let q=document.getElementById('pDetailQty');if(Number(q.innerText)<${estoque})q.innerText=Number(q.innerText)+1;" style="background:none;border:none;color:#fff;font-size:18px;font-weight:bold;cursor:pointer;padding:0 6px;">+</button>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:auto;">
+            <button type="button" onclick="buyNowProduct(${pJson})" ${semEstoque?'disabled':''} style="width:100%;background:linear-gradient(135deg,#06b6d4,#0284c7);color:#041019;border:none;padding:14px;border-radius:12px;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 0 15px rgba(6,182,212,0.4);">
+              ${semEstoque?'Produto Esgotado':'Comprar Agora (Direto ao Pagamento)'}
+            </button>
+            <button type="button" onclick="addCustomQtyCart(${pJson})" ${semEstoque?'disabled':''} style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#fff;padding:12px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;">
+              Adicionar ao Carrinho 🛒
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DESCRIÇÃO -->
+      <div style="margin-top:24px;background:#0c1322;border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:20px;">
+        <h3 style="font-size:16px;color:#38bdf8;margin:0 0 12px;text-transform:uppercase;">Descrição do Produto</h3>
+        <div style="color:#cbd5e1;line-height:1.7;font-size:14px;white-space:pre-wrap;">${esc(p.description || 'Produto de alta qualidade com garantia MachadoExpress.')}</div>
+      </div>
+    </div>
+  `;
+};
+
+window.buyNowProduct = function(p) {
+  const qty = Number(document.getElementById('pDetailQty')?.innerText || 1);
+  for (let i = 0; i < qty; i++) {
+    addCart(p);
+  }
+  openCheckoutPanel();
+};
+
+window.addCustomQtyCart = function(p) {
+  const qty = Number(document.getElementById('pDetailQty')?.innerText || 1);
+  for (let i = 0; i < qty; i++) {
+    addCart(p);
+  }
+  toast(`✓ ${qty}x ${p.name} adicionado ao carrinho!`);
 };
